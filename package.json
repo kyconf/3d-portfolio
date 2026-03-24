@@ -1,0 +1,18 @@
+{
+  "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "@types/three": "^0.183.1",
+    "express": "^5.2.1",
+    "lucide-react": "^1.0.1",
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "scripts": {
+    "start": "node ./2d-website/server.js",
+    "dev": "nodemon ./2d-website/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}

@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMO OS v1.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;700&family=Silkscreen&family=DM+Mono&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  :root{
+    --bmo-green: #5bcb9a;
+    --bmo-green-dark: #3da87a;
+    --bmo-green-darker: #2d8a62;
+    --bmo-teal: #1a6b52;
+    --bmo-screen: #0a2e3d;
+    --bmo-screen-glow: #0d3a4d;
+    --bmo-blue: #4ac8e8;
+    --bmo-blue-dim: #2a8aaa;
+    --bmo-yellow: #f5d63d;
+    --bmo-yellow-dim: #c4a82e;
+    --bmo-red: #e85454;
+    --bmo-red-btn: #d94040;
+    --bmo-dark: #0c1f18;
+    --bmo-face-bg: #0b2a38;
+    --bmo-white: #e8f5e9;
+    --bmo-gray: #2a4a3a;
+    --bmo-gray-light: #5a8a6a;
+    --px: 8px;
+  }
+
+  .maximized {
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: calc(100vh - 36px) !important; 
+  z-index: 99 !important;
+  border-radius: 0;
+}
+
+  body{
+    background: var(--bmo-green);
+    width:100vw;height:100vh;overflow:hidden;
+    font-family:'Silkscreen',monospace;
+    color:var(--bmo-white);
+    position:relative;
+    background-image:
+      linear-gradient(rgba(90,200,150,0.15) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(90,200,150,0.15) 1px, transparent 1px);
+    background-size:32px 32px;
+  }
+
+.bmo-screen-frame {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* Control the size of BMO's face here */
+  width: 600px;  
+  height: 450px; 
+
+  border-radius: 20px;
+  overflow: hidden; /* This is the "clipper" */
+  z-index: -1;
+  background: #cefec8; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#bg-video {
+  /* We force the video to be at least as big as the frame */
+  min-width: 100%;
+  min-height: 100%;
+  /* This ensures it scales up enough to hide the black bars */
+  object-fit: cover; 
+
+  transform: scale(1.05); 
+  display: block;
+}
+/* Update your body tag to remove the old green background */
+body {
+  background: #cefec8; /* Fallback color */
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Silkscreen', monospace;
+  color: var(--bmo-white);
+  position: relative;
+  /* Remove the linear-gradients if you want the video to be clear */
+}
+
+
+
+
+  /* === Desktop Icons === */
+  .icons{
+    position:absolute;top:20px;left:16px;
+    display:flex;flex-direction:column;gap:10px;z-index:2;
+  }
+  .icon{
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    cursor:pointer;transition:transform 0.1s;
+  }
+  .icon:hover .icon-shape{filter:brightness(1.2);}
+  .icon:active{transform:scale(0.9);}
+  .icon-shape{
+    width:36px;height:28px;position:relative;
+    transition:filter 0.15s;
+  }
+  .icon-shape .body{
+    position:absolute;bottom:0;left:0;width:100%;height:80%;border-radius:3px;
+  }
+  .icon-shape .tab{
+    position:absolute;top:0;left:0;width:55%;height:30%;border-radius:3px 3px 0 0;
+  }
+  .icon span{
+    font-size:6px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--bmo-dark);text-shadow:0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  /* === Center file icon === */
+  .center-icon{
+    position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    display:flex;flex-direction:column;align-items:center;gap:5px;
+    cursor:pointer;z-index:3;transition:transform 0.1s;
+  }
+  .center-icon:hover .file-icon{filter:brightness(1.2);}
+  .center-icon:active{transform:translate(-50%,-50%) scale(0.9);}
+  .file-icon{
+    width:48px;height:56px;position:relative;transition:filter 0.15s;
+  }
+  .file-icon .file-body{
+    position:absolute;top:8px;left:0;width:100%;height:48px;
+    background:var(--bmo-white);border-radius:3px;
+    border:2px solid var(--bmo-teal);
+  }
+  .file-icon .file-fold{
+    position:absolute;top:0;right:0;width:16px;height:16px;
+    background:var(--bmo-green-dark);
+    clip-path:polygon(0 0,100% 100%,0 100%);
+    border-radius:0 0 0 2px;
+  }
+  .file-icon .file-corner{
+    position:absolute;top:0;right:0;width:16px;height:16px;
+    background:var(--bmo-white);border:2px solid var(--bmo-teal);
+    border-radius:0 3px 0 0;
+    clip-path:polygon(0 0,100% 0,100% 100%);
+  }
+  .file-icon .file-lines{
+    position:absolute;top:18px;left:8px;right:8px;
+    display:flex;flex-direction:column;gap:4px;
+  }
+  .file-icon .file-line{
+    height:2px;background:var(--bmo-teal);border-radius:1px;opacity:0.4;
+  }
+  .file-icon .file-line:nth-child(2){width:75%;}
+  .file-icon .file-line:nth-child(3){width:60%;}
+  .center-icon .file-label{
+    font-size:8px;letter-spacing:1px;
+    color:var(--bmo-dark);text-shadow:0 1px 0 rgba(255,255,255,0.3);
+    font-family:'Silkscreen',monospace;
+  }
+
+  /* === Windows === */
+  .window{
+    position:absolute;
+    border:2px solid var(--bmo-teal);
+    border-radius:6px;
+    background:var(--bmo-screen);
+    box-shadow:
+      4px 4px 0 rgba(12,31,24,0.5),
+      inset 0 0 30px rgba(74,200,232,0.03);
+    z-index:5;
+    display:flex;flex-direction:column;
+    overflow:hidden;
+  }
+  .titlebar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:5px 8px;
+    font-family:'Pixelify Sans',sans-serif;font-size:12px;
+    flex-shrink:0;cursor:default;
+    border-bottom:2px solid var(--bmo-teal);
+  }
+  .titlebar-buttons{display:flex;gap:5px;}
+  .titlebar-buttons span{
+    width:14px;height:14px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:7px;cursor:pointer;transition:transform 0.1s;
+    font-family:'Silkscreen',monospace;
+  }
+  .titlebar-buttons span:active{transform:scale(0.85);}
+  .btn-close{background:var(--bmo-red-btn);color:var(--bmo-white);}
+  .btn-min{background:var(--bmo-yellow);color:var(--bmo-dark);}
+  .btn-max{background:var(--bmo-green-dark);color:var(--bmo-dark);}
+
+  .window-body{flex:1;overflow:hidden;padding:8px;}
+
+  /* Terminal */
+  .win-terminal{
+    top:40px;left:100px;width:380px;height:320px;
+  }
+  .win-terminal .titlebar{
+    background:var(--bmo-teal);color:var(--bmo-yellow);
+  }
+  .terminal-lines{
+    font-family:'DM Mono',monospace;font-size:11px;line-height:1.65;white-space:pre;
+  }
+  .t-blue{color:var(--bmo-blue);}
+  .t-blue-dim{color:var(--bmo-blue-dim);}
+  .t-green{color:var(--bmo-green);}
+  .t-green-dim{color:var(--bmo-green-dark);}
+  .t-yellow{color:var(--bmo-yellow);}
+  .t-yellow-dim{color:var(--bmo-yellow-dim);}
+  .t-white{color:var(--bmo-white);}
+  .t-gray{color:var(--bmo-gray-light);}
+  .t-red{color:var(--bmo-red);}
+  .cursor-blink{animation:blink 0.8s step-end infinite;}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+  /* === Browser Window === */
+  .win-browser{
+    top:60px;left:260px;width:620px;height:480px;
+    display:flex;
+  }
+  .win-browser .titlebar{
+    background:var(--bmo-green-darker);color:var(--bmo-white);
+  }
+  .address-bar{
+    display:flex;align-items:center;gap:6px;
+    padding:5px 8px;
+    background:var(--bmo-dark);
+    border-bottom:1px solid var(--bmo-teal);
+    flex-shrink:0;
+  }
+  .address-bar .nav-btns{
+    display:flex;gap:4px;
+  }
+  .address-bar .nav-btn{
+    width:18px;height:18px;
+    background:var(--bmo-gray);
+    border:1px solid var(--bmo-teal);
+    border-radius:3px;
+    color:var(--bmo-gray-light);
+    font-size:10px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:default;
+    font-family:'DM Mono',monospace;
+  }
+  .address-bar .url-box{
+    flex:1;
+    background:var(--bmo-screen);
+    border:1px solid var(--bmo-teal);
+    border-radius:3px;
+    padding:3px 8px;
+    font-family:'DM Mono',monospace;
+    font-size:10px;
+    color:var(--bmo-white);
+    display:flex;align-items:center;gap:4px;
+  }
+  .address-bar .url-box .lock{
+    color:var(--bmo-green);font-size:8px;
+  }
+  .address-bar .url-box .url-text{
+    color:var(--bmo-gray-light);
+  }
+  .address-bar .url-box .url-text b{
+    color:var(--bmo-white);font-weight:normal;
+  }
+  .browser-content{
+    flex:1;overflow:hidden;
+    background:#0d1a14;
+    position:relative;
+  }
+  .browser-iframe{
+    width:100%;height:100%;border:none;
+    display:none;
+  }
+  .browser-loading{
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    text-align:center;
+    font-family:'Pixelify Sans',sans-serif;
+    color:var(--bmo-green);
+  }
+  .browser-loading .spinner{
+    display:inline-block;
+    width:24px;height:24px;
+    border:3px solid var(--bmo-teal);
+    border-top-color:var(--bmo-green);
+    border-radius:50%;
+    animation:spin 0.8s linear infinite;
+    margin-bottom:8px;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .win-hidden{display:none!important;}
+  .task-hidden{display:none!important;}
+
+  /* === Taskbar === */
+  .taskbar{
+    position:absolute;bottom:0;left:0;right:0;height:36px;
+    background:var(--bmo-green-dark);
+    border-top:2px solid var(--bmo-teal);
+    display:flex;align-items:center;padding:0 8px;gap:6px;z-index:10;
+  }
+  .start-btn{
+    background:var(--bmo-yellow);color:var(--bmo-dark);
+    border:2px solid var(--bmo-yellow-dim);
+    padding:3px 12px;font-family:'Silkscreen',monospace;
+    font-size:9px;cursor:pointer;border-radius:3px;
+    letter-spacing:1px;transition:all 0.1s;
+  }
+  .start-btn:active{transform:scale(0.95);filter:brightness(0.85);}
+  .task-item{
+    background:var(--bmo-teal);border:1px solid var(--bmo-green-darker);
+    padding:3px 10px;font-size:7px;border-radius:2px;
+    color:var(--bmo-white);cursor:pointer;
+  }
+  .clock{
+    margin-left:auto;font-family:'DM Mono',monospace;
+    font-size:10px;color:var(--bmo-yellow);
+  }
+
+  .version{
+    position:absolute;bottom:42px;right:10px;
+    font-family:'DM Mono',monospace;font-size:7px;
+    color:var(--bmo-green-darker);z-index:1;
+  }
+
+  .pixel-football{
+    position:absolute;bottom:52px;left:20px;z-index:1;
+    font-family:'Pixelify Sans',sans-serif;font-size:9px;
+    color:var(--bmo-teal);text-align:center;
+  }
+  .pixel-football canvas{
+    image-rendering:pixelated;display:block;margin:0 auto 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="bmo-screen-frame">
+  <video autoplay muted loop playsinline id="bg-video">
+    <source src="bmoface.mp4" type="video/mp4">
+  </video>
+</div>
+
+<div class="bmo-face-bg"></div>
+<div class="sparkles" id="sparkles"></div>
+
+<!-- Desktop Icons -->
+<div class="icons">
+  <div class="icon">
+    <div class="icon-shape"><div class="tab" style="background:var(--bmo-blue)"></div><div class="body" style="background:var(--bmo-blue)"></div></div>
+    <span>games</span>
+  </div>
+  <div class="icon">
+    <div class="icon-shape"><div class="tab" style="background:var(--bmo-yellow)"></div><div class="body" style="background:var(--bmo-yellow)"></div></div>
+    <span>photos</span>
+  </div>
+  <div class="icon">
+    <div class="icon-shape"><div class="tab" style="background:var(--bmo-red)"></div><div class="body" style="background:var(--bmo-red)"></div></div>
+    <span>music</span>
+  </div>
+  <div class="icon">
+    <div class="icon-shape"><div class="tab" style="background:var(--bmo-green-dark)"></div><div class="body" style="background:var(--bmo-green-dark)"></div></div>
+    <span>camera</span>
+  </div>
+  <div class="icon">
+    <div class="icon-shape"><div class="tab" style="background:var(--bmo-white)"></div><div class="body" style="background:var(--bmo-white)"></div></div>
+    <span>secrets</span>
+  </div>
+</div>
+
+<!-- Center Portfolio File Icon -->
+<div class="center-icon" id="portfolioIcon">
+  <div class="file-icon">
+    <div class="file-body"></div>
+    <div class="file-corner"></div>
+    <div class="file-lines">
+      <div class="file-line"></div>
+      <div class="file-line"></div>
+      <div class="file-line"></div>
+    </div>
+  </div>
+  <span class="file-label">portfolio.html</span>
+</div>
+
+<!-- Terminal Window -->
+<div class="window win-terminal" id="terminalWindow">
+  <div class="titlebar">
+    BMO TERMINAL
+    <div class="titlebar-buttons">
+      <span class="btn-min" onclick="toggleWindow('terminal')"></span>
+      <span class="btn-max" onclick="maximizeWindow('terminal')"></span>
+    
+      <span class="btn-close" onclick="closeWindow('terminal')">x</span>  
+    </div>
+  </div>
+  <div class="window-body" style="overflow-y:auto;">
+    <div class="terminal-lines" id="terminal"></div>
+  </div>
+</div>
+
+<!-- Browser Window -->
+<div class="window win-browser win-hidden" id="browserWindow">
+  <div class="titlebar">
+    BMO BROWSER
+    <div class="titlebar-buttons">
+           <span class="btn-min" onclick="toggleWindow('browser')">__</span>
+       <span class="btn-max" onclick="maximizeWindow('browser')"></span>
+ 
+      <span class="btn-close" onclick="closeWindow('browser')">x</span>
+    </div>
+  </div>
+  <div class="address-bar">
+    <div class="nav-btns">
+      <div class="nav-btn">‹</div>
+      <div class="nav-btn">›</div>
+      <div class="nav-btn">⟳</div>
+    </div>
+    <div class="url-box">
+      <span class="lock">🔒</span>
+      <span class="url-text"><b>localhost:5173</b>/portfolio</span>
+    </div>
+  </div>
+  <div class="browser-content">
+    <div class="browser-loading" id="browserLoading">
+      <div class="spinner"></div>
+      <div>loading...</div>
+    </div>
+    <iframe class="browser-iframe" id="browserIframe"></iframe>
+  </div>
+</div>
+
+<!-- Football pixel art -->
+<div class="pixel-football">
+  <canvas id="footballCanvas" width="40" height="40"></canvas>
+  football
+</div>
+
+<div class="version">BMO OS v2.0</div>
+
+<!-- Taskbar -->
+<div class="taskbar">
+  <button class="start-btn">♥ BMO</button>
+  <div class="task-item" id="taskTerminal" onclick="toggleWindow('terminal')">terminal</div>
+  <div class="task-item task-hidden" id="taskBrowser" onclick="toggleWindow('browser')">browser</div>
+  <div class="clock" id="clock">00:00</div>
+</div>
+
+
+
+<script>
+function maximizeWindow(name) {
+  const winId = name === 'terminal' ? 'terminalWindow' : 'browserWindow';
+  const win = document.getElementById(winId);
+  win.classList.toggle('maximized');
+}
+
+
+// Clock
+function updateClock(){
+  const d=new Date();
+  document.getElementById('clock').textContent=
+    String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+updateClock();setInterval(updateClock,10000);
+
+// Terminal boot sequence
+const bootLines=[
+  ['> bmo boot sequence!','t-green'],
+  ['  loading fun modules...... OK','t-green-dim'],
+  ['  mounting /dev/controller.. OK','t-green-dim'],
+  ['  camera: ready!','t-blue-dim'],
+  ['  memory: lots and lots!','t-blue-dim'],
+  ['',''],
+  ['> who wants to play video games?','t-yellow'],
+  ['  scanning cartridges...','t-gray'],
+  ['  [1] Adventure Master','t-blue'],
+  ['  [2] Bug Battle','t-blue'],
+  ['  [3] Conversation Parade','t-blue'],
+  ['  [4] Guardians of Sunshine','t-yellow'],
+  ['',''],
+  ['> bmo is the greatest!','t-yellow'],
+];
+
+const npmLines=[
+  ['',''],
+  ['> npm run dev','t-white'],
+  ['',''],
+  ['> portfolio@1.0.0 dev','t-gray'],
+  ['> vite','t-gray'],
+  ['',''],
+  ['  VITE v5.4.19  ready in 342ms','t-green'],
+  ['',''],
+  ['  ➜  Local:   http://localhost:3000/','t-blue'],
+  ['  ➜  Network: http://192.168.1.42:3000/','t-blue-dim'],
+  ['  ➜  press h + enter to show help','t-gray'],
+  ['',''],
+  ['  ♥ bmo is serving portfolio.html!','t-yellow'],
+  ['  GET /portfolio.html 200 12ms','t-green-dim'],
+];
+
+const term=document.getElementById('terminal');
+let li=0;
+let bootDone=false;
+
+function typeLine(){
+  if(li>=bootLines.length){
+    const cur=document.createElement('div');
+    cur.id='termCursor';
+    cur.innerHTML='<span class="t-green">> <span class="cursor-blink">_</span></span>';
+    term.appendChild(cur);
+    bootDone=true;
+    return;
+  }
+  const div=document.createElement('div');
+  div.className=bootLines[li][1];
+  div.textContent=bootLines[li][0];
+  div.style.opacity='0';term.appendChild(div);
+  requestAnimationFrame(()=>{div.style.opacity='1';});
+  li++;setTimeout(typeLine,55+Math.random()*45);
+}
+setTimeout(typeLine,400);
+
+// Portfolio click handler
+let portfolioOpened=false;
+document.getElementById('portfolioIcon').addEventListener('click',function(){
+  if(portfolioOpened) return;
+  portfolioOpened=true;
+
+  // Remove cursor
+  const cur=document.getElementById('termCursor');
+  if(cur) cur.remove();
+
+  // Type npm lines in terminal
+  let ni=0;
+  function typeNpmLine(){
+    if(ni>=npmLines.length){
+      const c=document.createElement('div');
+      c.innerHTML='<span class="t-green">> <span class="cursor-blink">_</span></span>';
+      term.appendChild(c);
+      // Scroll terminal to bottom
+      term.parentElement.scrollTop=term.parentElement.scrollHeight;
+      return;
+    }
+    const div=document.createElement('div');
+    div.className=npmLines[ni][1];
+    div.textContent=npmLines[ni][0];
+    div.style.opacity='0';term.appendChild(div);
+    requestAnimationFrame(()=>{div.style.opacity='1';});
+    // Scroll terminal
+    term.parentElement.scrollTop=term.parentElement.scrollHeight;
+    ni++;
+
+
+    if(ni===npmLines.length){
+      setTimeout(typeNpmLine,80);
+      setTimeout(openBrowser,600);
+    } else {
+      setTimeout(typeNpmLine,70+Math.random()*60);
+    }
+  }
+
+  // Small delay then start typing
+  setTimeout(typeNpmLine,200);
+});
+
+function openBrowser(){
+  const bw=document.getElementById('browserWindow');
+  bw.classList.remove('win-hidden');
+  document.getElementById('taskBrowser').classList.remove('task-hidden');
+  document.getElementById('browserLoading').style.display='flex';
+  document.getElementById('browserIframe').style.display='none';
+  setTimeout(()=>{
+    document.getElementById('browserLoading').style.display='none';
+    const iframe=document.getElementById('browserIframe');
+    iframe.src='2d-website/pixel_desktop.html';
+    iframe.style.display='block';
+  },1200);
+}
+
+function closeWindow(name){
+  if(name==='terminal'){
+    document.getElementById('terminalWindow').classList.add('win-hidden');
+    document.getElementById('taskTerminal').classList.add('task-hidden');
+  } else if(name==='browser'){
+    document.getElementById('browserWindow').classList.add('win-hidden');
+    document.getElementById('taskBrowser').classList.add('task-hidden');
+  }
+}
+
+function toggleWindow(name){
+  if(name==='terminal'){
+    document.getElementById('terminalWindow').classList.toggle('win-hidden');
+  } else if(name==='browser'){
+    document.getElementById('browserWindow').classList.toggle('win-hidden');
+  }
+}
+
+// Football pixel art
+const fc=document.getElementById('footballCanvas');
+const fx=fc.getContext('2d');
+fx.fillStyle='#5bcb9a';
+fx.fillRect(8,4,24,28);
+fx.fillStyle='#0a2e3d';
+fx.fillRect(12,8,16,12);
+fx.fillStyle='#4ac8e8';
+fx.fillRect(16,11,3,3);fx.fillRect(21,11,3,3);
+fx.fillStyle='#5bcb9a';
+fx.fillRect(18,15,4,2);
+fx.fillStyle='#d94040';
+fx.fillRect(14,24,4,3);
+fx.fillStyle='#4ac8e8';
+fx.fillRect(22,24,4,3);
+fx.fillStyle='#3da87a';
+fx.fillRect(10,32,4,4);fx.fillRect(26,32,4,4);
+</script>
+</body>
+</html>
