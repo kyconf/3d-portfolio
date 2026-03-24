@@ -337,10 +337,10 @@
     z-index: 1;
   }
 
-  /* Pixel mountain */
+ 
   .mountain {
     position: absolute;
-    bottom: 0vh;
+    bottom: 2vh;
     right: 240px;
     display: grid;
     grid-template-columns: repeat(10, var(--px));
@@ -354,10 +354,9 @@
 
   .titleName {
     margin-left: 2vw;
-    margin-top: 5vw;
+    margin-top: 1vw;
+    color: white;
   }
-
-
 
   #myName {
     font-size: 4vh;
@@ -382,7 +381,7 @@
              blinkTextCursor 700ms infinite;
 }
 
-.navBar {
+/* .navBar {
   display:flex;
   margin-top: 20vh;
   gap: 100px;
@@ -394,7 +393,7 @@
   border-right: 2px solid grey;
   border-bottom: 2px solid grey;
   background-color: #171c3c;
-}
+} */
 
 .about {
 
@@ -408,4 +407,132 @@
 background-color: white;
 
 
+}
+
+
+.nav-container {
+    width: 100%;
+    border-top: 2px solid var(--green);
+    border-bottom: 2px solid var(--gray);
+    background: #111827; 
+    margin-top: 20px;
+}
+
+.nav-bar {
+    display: flex;
+    max-width: 1200px;
+    margin-left: 2vw;
+}
+
+.nav-item {
+    padding: 15px 40px;
+    color: var(--gray-light);
+    text-decoration: none;
+    font-size: 14px;
+    border-right: 1px solid var(--gray);
+    transition: 0.2s;
+}
+
+.nav-item.active {
+    background: var(--green);
+    color: var(--navy);
+}
+
+.nav-item:hover:not(.active) {
+    background: rgba(74, 222, 128, 0.1);
+    color: var(--white);
+}
+
+
+.content-section {
+    padding: 60px 10%;
+    z-index: 2;
+    position: relative;
+}
+
+.section-title {
+    color: var(--green);
+    font-size: 24px;
+    margin-bottom: 30px;
+}
+
+.about-grid {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+
+.pixel-box {
+    border: 2px solid var(--white);
+    background: rgba(0, 0, 0, 0.2);
+    padding: 20px;
+}
+
+.avatar-box {
+    width: 200px;
+    height: 200px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.avatar-img {
+    width: 120px;
+    height: auto;
+    image-rendering: pixelated;
+}
+
+.bio-box {
+    flex: 1;
+    line-height: 1.8;
+    font-size: 16px;
+    letter-spacing: 1px;
+}
+
+.bio-box p {
+    margin-bottom: 20px;
+}
+
+
+.tag-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+}
+
+.tag {
+    background: var(--green-dim);
+    border: 1px solid var(--green);
+    color: var(--white);
+    padding: 5px 15px;
+    font-size: 10px;
+}
+
+/* --- Footer --- */
+.footer {
+    position: absolute;
+    bottom: 40px;
+    width: 100%;
+    text-align: center;
+    font-size: 10px;
+}
+
+.footer-line {
+    height: 2px;
+    background: var(--green);
+    width: 90%;
+    margin: 0 auto 20px;
+}
+
+.social-links {
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.social-links a {
+    color: var(--green);
+    text-decoration: none;
 }

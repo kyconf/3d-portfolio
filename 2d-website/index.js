@@ -87,3 +87,14 @@ for(let y=0;y<ch;y+=2){
     ctx.fillRect(x,y,2,2);
   }
 }
+console.log("Hello");
+document.addEventListener('keydown', (event) => {
+  // Check if the key pressed is Enter
+  if (event.key === 'Enter') {
+    // Optional: Add a small sound effect or a quick flash here
+    console.log('Booting PXOS...');
+    
+    // Redirect to your main portfolio page
+    window.location.href = 'front.html'; 
+  }
+});
