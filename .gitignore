@@ -1,7 +1,5 @@
 node_modules
 
-*.glb
-*.blend
 
 *.mp4
 *.png
