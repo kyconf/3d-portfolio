@@ -936,8 +936,9 @@ function unregisterClickable(target) {
 window.addEventListener('pointerdown', (event) => {
   if (!appReady) return;
 
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(interactionBoundingBoxes, false);
 
@@ -1059,8 +1060,9 @@ function processPointerHover() {
   pendingPointerEvent = null;
   if (!event) return;
 
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(interactionBoundingBoxes, false);
 
@@ -1723,11 +1725,19 @@ window.addEventListener('beforeunload', () => {
 
 // resize — updates camera aspect and composer size on window resize
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-  composerTarget.setSize(window.innerWidth, window.innerHeight);
+
+  renderer.setSize(width, height);
+  composer.setSize(width, height);
+  composerTarget.setSize(width, height);
+
+  // This forces the hidden outline selection texture to match the viewport pixel-for-pixel
+  outlinePass.setSize(width, height);
+  bloomPass.setSize(Math.floor(width / 2), Math.floor(height / 2));
 });
 
 // keydown (Escape) — triggers the camera escape animation back to default view
