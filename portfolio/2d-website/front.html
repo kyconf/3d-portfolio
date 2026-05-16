@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>kyle's 2D</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500&family=Silkscreen&family=DM+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="externals.css">
+<link rel="icon" type="image/png" href="../bmoicon2.png">
+</head>
+<body>
+
+<div class="titleName">
+ <h1 id="myName"> KYLE_FERNANDEZ </h1>
+ <h2 id="desc" class="typography3"> full stack developer </h2>
+</div>
+
+
+
+
+<div class="nav-container">
+    <nav class="nav-bar">
+        <a href="#" class="nav-item active" data-target="about">ABOUT</a>
+        <a href="#" class="nav-item" data-target="projects">PROJECTS</a>
+        <a href="#" class="nav-item" data-target="skills" >SKILLS</a>
+        <a href="#" class="nav-item" data-target="contact">CONTACT</a>
+    </nav>
+</div>
+
+
+
+<main class="content-section">
+    <div id="about" class="page-section">
+        <h2 class="section-title"><span class="animarrow">>    </span>ABOUT ME</h2>
+        <div class="about-grid">
+
+            <!-- Left: profile card -->
+            <div class="profile-card pixel-box">
+                <div class="pixel-art-placeholder">
+                    <img src="kyle2.png" alt="Pixel Avatar" class="avatar-img">
+                </div>
+                <div class="profile-info">
+                    <p class="profile-name">KYLE_FERNANDEZ</p>
+                    <p class="profile-role">// full stack dev</p>
+                    <div class="profile-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">online</span>
+                    </div>
+                </div>
+                <div class="profile-stats">
+                    <div class="profile-stat"><span class="stat-k">LOC</span><span class="stat-v">Toronto, CA</span></div>
+                    <div class="profile-stat"><span class="stat-k">EDU</span><span class="stat-v">York University</span></div>
+                    <div class="profile-stat"><span class="stat-k">EXP</span><span class="stat-v">3+ years</span></div>
+                </div>
+            </div>
+
+            <div class="about-right">
+                <div class="pixel-box bio-box">
+                    <p><strong>Hey! I'm Kyle </strong>— a full stack developer who likes to dabble in a lot of things. Engineering, 3D modeling, games, cybersecurity — if it's interesting, I'm probably exploring it. Ask me anything, from anything to why I do what I do!</p>
+                    <br>
+                    
+                    <p><i>"When you're curious, you find plenty of interesting things to do." -Walt Disney</i></p>
+                    <div class="tag-container">
+                        <span class="tag">cybersecurity</span>
+                        <span class="tag">ai</span>
+                        <span class="tag">3d modeling</span>
+                        <span class="tag">game dev</span>
+                        <span class="tag">engineering</span>
+                        <span class="tag">bouldering</span>
+                        <span class="tag">music</span>
+                        <span class="tag">piano/guitar/banduria</span>
+                    </div>
+                </div>
+
+                <div class="pixel-box quest-box">
+                    <p class="stat-header">⚔ ACTIVE QUESTS</p>
+                    <div class="quest-item">
+                        <span class="quest-dot"></span>
+                        <span class="quest-text">BSc Specialized Honors Computer Security @ York University</span>
+                    </div>
+                    <div class="quest-item">
+                        <span class="quest-dot"></span>
+                        <span class="quest-text">Improving the IRL Interactive BMO-bot</span>
+                    </div>
+                    <div class="quest-item">
+                        <span class="quest-dot"></span>
+                        <span class="quest-text">Learning more about AI / ML</span>
+                    </div>
+                        <div class="quest-item">
+                        <span class="quest-dot"></span>
+                        <span class="quest-text">Getting my CompTIA Security+ Certification</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="projects" class="page-section" style="display: none;">
+        <div class="sec"> 
+        <h2 class="section-title"><span class="animarrow">> </span>  PROJECTS</h2>
+        </div>
+        <div id="projects-grid" class="grid-container">
+            </div>
+    </div>
+
+    <div id="skills" class="page-section" style="display: none;">
+    <h2 class="section-title"><span class="animarrow">> </span> SKILLS</h2>
+    <div id="skills-container"></div>
+</div>
+
+    <div id="contact" class="page-section" style="display: none;">
+        <h2 class="section-title"><span class="animarrow">> </span> CONTACT</h2>
+        <div class="pixel-box contact-blurb">
+            <p>whether it's a project, a collab, or just saying hi —</p>
+            <p>feel free to reach out through any of the links below.</p>
+        </div>
+        <form class="pixel-box contact-form" action="mailto:kyconf@gmail.com" method="POST" enctype="text/plain">
+            <div class="contact-form-row">
+                <div class="contact-field">
+                    <label class="contact-field-label">// NAME</label>
+                    <input type="text" name="name" class="contact-input" placeholder="your name" required>
+                </div>
+                <div class="contact-field">
+                    <label class="contact-field-label">// EMAIL</label>
+                    <input type="email" name="email" class="contact-input" placeholder="your@email.com" required>
+                </div>
+            </div>
+            <div class="contact-field">
+                <label class="contact-field-label">// MESSAGE</label>
+                <textarea name="message" class="contact-input contact-textarea" placeholder="what's on your mind?" rows="4" required></textarea>
+            </div>
+            <button type="submit" class="contact-submit">[ SEND MESSAGE ]</button>
+        </form>
+
+        <div class="contact-cards">
+            <a href="mailto:kyconf@gmail.com" class="contact-card">
+                <span class="contact-icon">[ ✉ ]</span>
+                <span class="contact-label">EMAIL</span>
+                <span class="contact-value">kyconf@gmail.com</span>
+            </a>
+            <a href="https://github.com/kyconf" target="_blank" rel="noopener noreferrer" class="contact-card">
+                <span class="contact-icon">[ ⌥ ]</span>
+                <span class="contact-label">GITHUB</span>
+                <span class="contact-value">github.com/kyconf</span>
+            </a>
+            <a href="https://www.linkedin.com/in/kyconf/" target="_blank" rel="noopener noreferrer" class="contact-card">
+                <span class="contact-icon">[ in ]</span>
+                <span class="contact-label">LINKEDIN</span>
+                <span class="contact-value">linkedin.com/in/kyconf</span>
+            </a>
+            <a href="https://www.instagram.com/ky_co_nf/" target="_blank" rel="noopener noreferrer" class="contact-card">
+                <span class="contact-icon">[ <svg fill="#4ade80" width="16px" height="16px" viewBox="0 0 32 32" id="Camada_1" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" stroke="#4ade80" style="vertical-align: middle; position: relative; top: -1px;"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <g> <path d="M22.3,8.4c-0.8,0-1.4,0.6-1.4,1.4c0,0.8,0.6,1.4,1.4,1.4c0.8,0,1.4-0.6,1.4-1.4C23.7,9,23.1,8.4,22.3,8.4z"></path> <path d="M16,10.2c-3.3,0-5.9,2.7-5.9,5.9s2.7,5.9,5.9,5.9s5.9-2.7,5.9-5.9S19.3,10.2,16,10.2z M16,19.9c-2.1,0-3.8-1.7-3.8-3.8 c0-2.1,1.7-3.8,3.8-3.8c2.1,0,3.8,1.7,3.8,3.8C19.8,18.2,18.1,19.9,16,19.9z"></path> <path d="M20.8,4h-9.5C7.2,4,4,7.2,4,11.2v9.5c0,4,3.2,7.2,7.2,7.2h9.5c4,0,7.2-3.2,7.2-7.2v-9.5C28,7.2,24.8,4,20.8,4z M25.7,20.8 c0,2.7-2.2,5-5,5h-9.5c-2.7,0-5-2.2-5-5v-9.5c0-2.7,2.2-5,5-5h9.5c2.7,0,5,2.2,5,5V20.8z"></path> </g> </g></svg> ]</span>
+                <span class="contact-label">INSTAGRAM</span>
+                <span class="contact-value">@ky_co_nf</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- <div class="scroll-hint" id="skills-scroll-hint">▼</div> -->
+</main>
+
+<footer class="footer">
+  <div class="mountain">
+    <div class="p"></div><div class="p"></div><div class="p"></div><div class="p"></div><div class="p g"></div><div class="p g"></div><div class="p"></div><div class="p"></div><div class="p"></div><div class="p"></div>
+    <div class="p"></div><div class="p"></div><div class="p"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p"></div><div class="p"></div><div class="p"></div>
+    <div class="p"></div><div class="p"></div><div class="p g"></div><div class="p g"></div><div class="p w"></div><div class="p w"></div><div class="p g"></div><div class="p g"></div><div class="p"></div><div class="p"></div>
+    <div class="p"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p w"></div><div class="p w"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p"></div>
+    <div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div>
+  </div>
+  <div class="footer-line"></div>
+
+  <p>© 2026 Kyle Fernandez</p>
+
+  <div class="social-links">
+    <a href="https://github.com/kyconf" target="_blank" rel="noopener noreferrer">
+      [GITHUB]
+    </a>
+
+    <a href="https://www.linkedin.com/in/kyconf/" target="_blank" rel="noopener noreferrer">
+      [LINKEDIN]
+    </a>
+  </div>
+</footer>
+
+
+
+
+
+<div class="version">KYCONF 7.2.6 // BUILD 20230905</div>
+
+
+
+
+<div class="stars" id="stars"></div>
+<script src="script.js"></script>
+<script src="index.js"></script>
+
+</body>
+</html>
