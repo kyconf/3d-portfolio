@@ -21,12 +21,9 @@ May work differently depending on the browser, operating system, and or specific
 ## tech stack
 
 ### Frontend & 3D Rendering
-*   **React:** Component-based UI architecture.
-*   **Three.js:** The core WebGL library used to render the 3D scene, lighting, and cameras.
-*   **React Three Fiber (R3F):** A React wrapper for Three.js, allowing declarative scene construction.
-*   **@react-three/drei:** Useful helpers and abstractions for working with R3F (e.g., OrbitControls, loader helpers).
 
-### 3D Asset Pipeline
+*   **Three.js:** The core WebGL library used to render the 3D scene, lighting, and cameras.
+*   **Vite:** A fast frontend build tool and development server that provides instant Hot Module Replacement (HMR) and optimized production bundling for assets and code.
 *   **Blender:** Used for 3D modeling, UV mapping, texture baking, and optimizing geometry.
 *   **GLTF/GLB:** The runtime asset format utilized for efficient delivery and loading of 3D models over the web.
 
