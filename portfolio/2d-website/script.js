@@ -89,7 +89,7 @@ const skillCategories = [
  
             { name: "SQL",  level: 9 },
             { name: "C",  level: 6 },
-            { name: "LUA",  level: 6 },
+            { name: "LUAU",  level: 6 },
         ]
     },
     {
