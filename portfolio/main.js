@@ -1932,7 +1932,7 @@ function showStaticScreen() {
   }
   navCover.style.opacity = '1';
   setTimeout(() => {
-    window.location.href = 'bmo_desktop.html';
+    window.location.href = '/bmo_desktop';
   }, 260);
 }
 
