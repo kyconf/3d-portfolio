@@ -706,7 +706,7 @@ function openBrowser(){
   setTimeout(()=>{
     document.getElementById('browserLoading').style.display='none';
     const iframe=document.getElementById('browserIframe');
-    iframe.src='2d-website/pixel_desktop.html';
+    iframe.src='/2d-website/pixel_desktop.html';
     iframe.style.display='block';
   },1200);
 
@@ -738,7 +738,7 @@ document.addEventListener('keydown', (event) => {
 
       setTimeout(() => {
         document.getElementById('browserLoading').style.display = 'none';
-        iframe.src = '2d-website/front.html';
+        iframe.src = '/2d-website/front.html';
         iframe.style.display = 'block';
 
         // Ensure the new page is focused for its internal JS
