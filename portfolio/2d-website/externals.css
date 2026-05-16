@@ -357,7 +357,9 @@
   .mountain {
     position: absolute;
     bottom: 0;      /* touches the very bottom of the page */
-    right: 2vw;
+
+    
+    right: 16vw;
     display: grid;
     grid-template-columns: repeat(10, var(--px));
     image-rendering: pixelated;
@@ -498,7 +500,7 @@ background-color: white;
 .about-grid {
     display: flex;
     gap: 24px;
-    align-items: stretch;
+    align-items: stretch; /* both columns match the taller one's height */
 }
 
 /* Profile card — left column */
@@ -509,7 +511,6 @@ background-color: white;
     flex-direction: column;
     gap: 0;
     padding: 0;
-    overflow: hidden;
 }
 
 .profile-card .pixel-art-placeholder {
@@ -599,17 +600,22 @@ background-color: white;
 /* Right column */
 .about-right {
     flex: 1;
+    min-width: 0; /* prevent flex overflow */
     display: flex;
     flex-direction: column;
     gap: 16px;
-    align-self: stretch;
+    height: 58vh;
 }
 
 .bio-box {
-    line-height: 1.9;
-    font-size: 13px;
+    flex: 1; /* grow to fill space the quest-box doesn't need */
+    display: flex;
+    flex-direction: column;
+    line-height: 1.8;
+    font-size: 16px;
     letter-spacing: 0.5px;
     font-family: 'DM Mono', monospace;
+    word-wrap: break-word;
 }
 
 .bio-box p {
@@ -621,7 +627,6 @@ background-color: white;
 .quest-box {
     padding: 20px;
     background: #1a1a1a;
-    flex: 1;
 }
 
 .quest-item {
@@ -665,24 +670,14 @@ background-color: white;
     image-rendering: pixelated;
 }
 
-.bio-box {
-    flex: 1;
-    line-height: 1.8;
-    font-size: 16px;
-    letter-spacing: 1px;
-}
-
-
-
-.bio-box p {
-    margin-bottom: 20px;
-}
 
 
 .tag-container {
     display: flex;
-    gap: 10px;
-    margin-top: 30px;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: auto; /* push to bottom of bio-box */
+    padding-top: 16px;
 }
 
 .tag {
@@ -701,7 +696,7 @@ background-color: white;
     font-size: 10px;
     background-color: #0a0e27;
     flex-shrink: 0;
-    padding: 8px 0 48px; /* bottom pad clears the 40px mountain so text doesn't overlap */
+    padding: 8px 0;
 }
 
 .footer-line {
@@ -744,30 +739,60 @@ background-color: white;
 
 @media (min-width: 640px) {
     .grid-container {
-        grid-template-columns: repeat(2, minmax(0, 1fr)); /* sm:grid-cols-2 */
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    /* Last card alone in its row spans both columns */
+    .grid-container > .pixel-card:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
     }
 }
 
+/* Medium windows: scale down card and text */
+@media (max-width: 900px) {
+    .content-section {
+        padding: 20px 40px;
+    }
+    .profile-card {
+        width: 190px;
+        flex-shrink: 0;
+    }
+    .profile-card .avatar-img {
+        width: 190px;
+    }
+    .project-title {
+        font-size: 1.1rem;
+    }
+    .project-desc {
+        font-size: 0.85rem;
+    }
+}
+
+/* Small windows: stack everything vertically */
 @media (max-width: 700px) {
+    .content-section {
+        padding: 16px 20px;
+    }
     .about-grid {
         flex-direction: column;
         align-items: stretch;
     }
-
     .profile-card {
         width: 100%;
     }
-
     .profile-card .avatar-img {
         width: 100%;
     }
-
     .about-right {
         width: 100%;
     }
-
     .contact-cards {
         grid-template-columns: repeat(2, 1fr);
+    }
+    .project-title {
+        font-size: 1rem;
+    }
+    .project-desc {
+        font-size: 0.8rem;
     }
 }
 
@@ -1111,6 +1136,10 @@ background-color: white;
     color: var(--green);
     font-family: 'DM Mono', monospace;
     letter-spacing: 1px;
+}
+
+.contact-icon svg {
+    top: 100px;
 }
 
 .contact-label {

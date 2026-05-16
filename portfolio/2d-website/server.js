@@ -4,7 +4,8 @@ const app = express();
 const PORT = 3000;
 
 // This tells the server where your HTML/CSS/JS files are
-app.use(express.static(path.join(__dirname, '2d-website')));
+// server.js lives inside the 2d-website folder, so __dirname IS that folder
+app.use(express.static(__dirname));
 
 app.listen(PORT, () => {
     console.log(`🚀 Server is flying at http://localhost:${PORT}`);

@@ -34,6 +34,8 @@ let hasOpenedStaticScreen = false;
 let updateTV = null;
 let ukulele = null;
 let whiteboardShadow = null;
+let switchMesh = null;
+let drawWB = null;
 // focusPresets — per-object camera/target offsets used by focusOnObject
 const focusPresets = {
   Cube009_1: {
@@ -50,8 +52,12 @@ const focusPresets = {
 const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 3, 10);
 
+// antialias is OFF — EffectComposer renders to its own HalfFloat target and
+// then runs OutputPass for the final blit, so hardware MSAA on the default
+// drawing buffer is never sampled. Leaving it on costs memory + GPU cycles
+// for a buffer nothing reads.
 const renderer = new THREE.WebGLRenderer({
-  antialias: true,
+  antialias: false,
   powerPreference: 'high-performance',
   stencil: false,
 });
@@ -59,7 +65,15 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
 document.body.appendChild(renderer.domElement);
 
-// Loading screen — shown while GLB downloads, drives a progress bar
+// appReady — flips true only once the GLB has finished loading and the scene
+// is interactive. The pointerdown handler short-circuits on !appReady, so
+// stray clicks on the title / picker / loading overlays never hit the
+// (still empty) scene graph.
+let appReady = false;
+
+// Loading screen — shown only after the user picks 3D, drives a progress bar.
+// Created up front so loadingScreen.querySelector(...) works, but NOT appended
+// to the body yet — that happens inside startSceneLoad() when the user picks 3D.
 const loadingScreen = document.createElement('div');
 loadingScreen.id = 'loadingScreen';
 loadingScreen.innerHTML = `
@@ -74,7 +88,6 @@ loadingScreen.innerHTML = `
     </div>
   </div>
 `;
-document.body.appendChild(loadingScreen);
 
 const loadingStyle = document.createElement('style');
 loadingStyle.innerHTML = `
@@ -139,7 +152,8 @@ loadingStyle.innerHTML = `
 `;
 document.head.appendChild(loadingStyle);
 
-// loadingTipInterval — cycles tip text in the loading bar so it doesn't feel frozen
+// loadingTipInterval — cycles tip text in the loading bar so it doesn't feel frozen.
+// Not started at module load — kicked off inside startSceneLoad() once 3D is picked.
 const loadingTipEl = loadingScreen.querySelector('#loadingTip');
 const loadingTips = [
   'preparing the scene...',
@@ -149,19 +163,109 @@ const loadingTips = [
   'waking up bmo...',
 ];
 let loadingTipIdx = 0;
-const loadingTipInterval = setInterval(() => {
-  loadingTipIdx = (loadingTipIdx + 1) % loadingTips.length;
-  if (loadingTipEl) loadingTipEl.textContent = loadingTips[loadingTipIdx];
-}, 1800);
+let loadingTipInterval = null;
+function startLoadingTipCycle() {
+  if (loadingTipInterval) return;
+  loadingTipInterval = setInterval(() => {
+    loadingTipIdx = (loadingTipIdx + 1) % loadingTips.length;
+    if (loadingTipEl) loadingTipEl.textContent = loadingTips[loadingTipIdx];
+  }, 1800);
+}
 
-// Experience picker — shown after loading, lets user choose 3D or 2D site
+// isMobile — narrow viewport OR a primary input device that doesn't have a
+// real mouse. The 3D experience needs OrbitControls + a hover cursor, neither
+// of which work great on touch, so we gate it behind this flag.
+const isMobile = window.matchMedia('(max-width: 900px), (pointer: coarse)').matches;
+
+// Title screen — first thing the user sees. Click anywhere to dismiss and
+// reveal the experience picker. The heavy 3D scene + GLB fetch don't even
+// start until the user explicitly opts into 3D from the picker.
+const titleScreen = document.createElement('div');
+titleScreen.id = 'titleScreen';
+titleScreen.innerHTML = `
+  <div class="title-content">
+    <div class="title-text">kyle's portfolio</div>
+    <div class="title-hint">click anywhere to begin</div>
+  </div>
+`;
+titleScreen.style.cssText = `
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 100001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  cursor: pointer;
+  opacity: 1;
+  overflow: hidden;
+  transition: opacity 0.45s ease-out;
+  font-family: 'Minecraftia', 'Courier New', monospace;
+  color: #c9f4df;
+`;
+const titleStyle = document.createElement('style');
+titleStyle.innerHTML = `
+  /* Blurred, darkened background image — pseudo-element keeps blur off the text */
+  #titleScreen::before {
+    content: '';
+    position: absolute;
+    inset: -60px;          /* overshoot edges so blur fringe is hidden */
+    background: url('/background.png') center / cover no-repeat;
+    filter: blur(50px) brightness(0.5);
+    z-index: 0;
+  }
+  /* Dark tint layer on top of the blurred image, under the text */
+  #titleScreen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 21, 48, 0.35);
+    z-index: 1;
+  }
+  /* Keep text above both pseudo-elements */
+  #titleScreen .title-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #titleScreen .title-text{
+    font-size: clamp(28px, 6vw, 44px);
+    letter-spacing: 6px;
+    text-align: center;
+    margin-bottom: 28px;
+    text-shadow: 0 0 20px rgba(91,203,154,0.25);
+  }
+  #titleScreen .title-hint{
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: 3px;
+    opacity: 0.55;
+    animation: titleHintPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes titleHintPulse{
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 0.15; }
+  }
+  #titleScreen.fade-out{
+    opacity: 0;
+    pointer-events: none;
+  }
+
+`;
+document.head.appendChild(titleStyle);
+document.body.appendChild(titleScreen);
+
+// Experience picker — shown after the title is clicked, lets user choose 3D or 2D site
 const pickerOverlay = document.createElement('div');
+pickerOverlay.id = 'pickerOverlay';
 pickerOverlay.style.cssText = `
   position: fixed;
   inset: 0;
-  background: rgba(10,21,48,0.82);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: transparent;
+  overflow: hidden;
   z-index: 99999;
   display: flex;
   flex-direction: column;
@@ -174,7 +278,39 @@ pickerOverlay.style.cssText = `
   font-family: 'Minecraftia', 'Courier New', monospace;
   color: #c9f4df;
 `;
-pickerOverlay.innerHTML = `
+// Inject real bg divs so the blurred image reliably covers whatever is behind the picker
+const pickerBgImage = document.createElement('div');
+pickerBgImage.style.cssText = `
+  position: absolute;
+  inset: -60px;
+  background: url('/background.png') center / cover no-repeat;
+  filter: blur(60px) brightness(0.3);
+  z-index: 0;
+`;
+pickerOverlay.appendChild(pickerBgImage);
+
+const pickerBgTint = document.createElement('div');
+pickerBgTint.style.cssText = `
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 21, 48, 0.35);
+  z-index: 1;
+`;
+pickerOverlay.appendChild(pickerBgTint);
+
+// Picker content — z-index 2 so it floats above the background layers
+const pickerContent = document.createElement('div');
+pickerContent.style.cssText = `
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+`;
+pickerOverlay.appendChild(pickerContent);
+
+pickerContent.innerHTML = `
   <div style="font-size:15px;letter-spacing:3px;margin-bottom:10px;opacity:0.8;">choose your experience</div>
   <div style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center;">
     <button id="pick3d" style="
@@ -219,7 +355,24 @@ pickerOverlay.innerHTML = `
 `;
 document.body.appendChild(pickerOverlay);
 
+const pick3dBtn = pickerOverlay.querySelector('#pick3d');
+const pick2dBtn = pickerOverlay.querySelector('#pick2d');
+
+// On mobile, the 3D button is visually disabled and shows a "desktop only"
+// label. Its click handler is a no-op so the heavy GLB never starts loading.
+if (isMobile) {
+  pick3dBtn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+    <span style="font-size:12px;letter-spacing:2px;line-height:1.6;">3d portfolio only<br>available on desktops</span>
+  `;
+  pick3dBtn.style.cursor = 'not-allowed';
+  pick3dBtn.style.opacity = '0.45';
+  pick3dBtn.disabled = true;
+}
+
+// Hover affordance — only on the 2D button on mobile (3D is disabled).
 ['pick3d', 'pick2d'].forEach(id => {
+  if (id === 'pick3d' && isMobile) return; // no hover lift on a disabled button
   const btn = pickerOverlay.querySelector(`#${id}`);
   btn.addEventListener('mouseenter', () => {
     btn.style.background = 'rgba(61,168,122,0.2)';
@@ -240,20 +393,42 @@ function closePicker() {
   setTimeout(() => pickerOverlay.remove(), 450);
 }
 
-pickerOverlay.querySelector('#pick3d').addEventListener('click', () => {
+// showPicker — fades in the experience picker (called from the title screen click).
+function showPicker() {
+  pickerOverlay.style.pointerEvents = 'auto';
+  pickerOverlay.style.opacity = '1';
+}
+
+// Title screen click → fade title out, fade picker in.
+titleScreen.addEventListener('click', () => {
+  titleScreen.classList.add('fade-out');
+  showPicker();
+  setTimeout(() => titleScreen.remove(), 500);
+}, { once: true });
+
+pick3dBtn.addEventListener('click', () => {
+  if (isMobile) return;                   // hard guard, also covered by `disabled`
   closePicker();
+  // Mount + show the loading overlay, start cycling tips, and fire the GLB fetch.
+  document.body.appendChild(loadingScreen);
+  startLoadingTipCycle();
+  startSceneLoad();
 });
 
-pickerOverlay.querySelector('#pick2d').addEventListener('click', () => {
+pick2dBtn.addEventListener('click', () => {
   pickerOverlay.style.opacity = '0';
   setTimeout(() => {
     window.location.href = '/2d-website/front.html';
   }, 350);
 });
 
-// dismissLoadingScreen — fills bar to 100%, fades out loading screen, shows picker
+// dismissLoadingScreen — fills bar to 100%, fades out loading screen,
+// and flips appReady so the scene's pointerdown handler comes online.
 function dismissLoadingScreen() {
-  clearInterval(loadingTipInterval);
+  if (loadingTipInterval) {
+    clearInterval(loadingTipInterval);
+    loadingTipInterval = null;
+  }
   const bar = document.getElementById('loadingBarFill');
   const pct = document.getElementById('loadingPercent');
   if (bar) bar.style.width = '100%';
@@ -262,8 +437,7 @@ function dismissLoadingScreen() {
     loadingScreen.classList.add('fade-out');
     setTimeout(() => {
       loadingScreen.remove();
-      pickerOverlay.style.pointerEvents = 'auto';
-      pickerOverlay.style.opacity = '1';
+      appReady = true;
     }, 700);
   }, 250);
 }
@@ -366,7 +540,7 @@ helpOverlay.innerHTML = `
       <li> <strong>esc</strong> - return to the default 3D view</li>
       
       <center> <li> -- examples -- </li></center>
-      <li> <strong>BMO (the little robot) </strong> - click BMO's screen to play</li>
+      <li> <strong>BMO (the little robot) </strong> - click BMO to focus, click again to play</li>
       <li> <strong>light switch</strong> - toggle day / night</li>
       <li> <strong>the bed</strong> - you can try</li>
     </ul>
@@ -453,17 +627,22 @@ moonFill.shadow.camera.bottom = -8;
 moonFill.shadow.camera.updateProjectionMatrix();
 moonFill.shadow.autoUpdate = false;
 
-// bulbLight — warm ceiling point light that casts shadows in night mode
+// bulbLight — warm ceiling point light that casts shadows in night mode.
+// PointLight shadows are 6 cubemap face renders, so every wasted unit of frustum
+// costs 6× as much as a directional light. The bulb sits at y=2 in a small
+// isometric room (~5×5×3); tightening near/far cuts depth-precision waste and
+// gives us crisper, cheaper shadow samples.
 const bulbLight = new THREE.PointLight(0xffd9a0, 5, 8, 1);
-bulbLight.position.set(0, 1.7, 0);
+bulbLight.position.set(0.5, 2, 0.5);
 bulbLight.castShadow = true;
 bulbLight.shadow.mapSize.width  = 1024;
 bulbLight.shadow.mapSize.height = 1024;
 bulbLight.shadow.bias           = -0.0005;
 bulbLight.shadow.normalBias     = 0.02;
 bulbLight.shadow.radius         = 4;
-bulbLight.shadow.camera.near = 0.1;
-bulbLight.shadow.camera.far  = 8;
+bulbLight.shadow.camera.near = 0.5;   // skip the bulb mesh itself + reclaim z-precision
+bulbLight.shadow.camera.far  = 5;     // room floor is ~2 units below, walls ~2.5 away
+bulbLight.shadow.camera.updateProjectionMatrix();
 bulbLight.shadow.autoUpdate = false;
 bulbLight.shadow.needsUpdate = true;
 scene.add(bulbLight);
@@ -539,14 +718,14 @@ const NIGHT_PALETTE = {
 };
 
 const DAY_PALETTE = {
-  background:        new THREE.Color(0x9bb2c1),
-  beamColor:         new THREE.Color(0xfff0c8),
+  background:        new THREE.Color(0x8aafc8),  // was 0x9bb2c1 — cooler blue sky
+  beamColor:         new THREE.Color(0xffe066),  // was 0xfff0c8 — richer yellow sunbeam
   beamIntensity:     2.4,
-  moonColor:         new THREE.Color(0xfff8e8),
+  moonColor:         new THREE.Color(0xe8f2ff),  // was 0xfff8e8 — cool blue-white sunlight
   moonIntensity:     4.0,
-  ambientColor:      new THREE.Color(0xe8ecf0),
+  ambientColor:      new THREE.Color(0xc8dcf8),  // was 0xe8ecf0 — noticeably bluer ambient
   ambientIntensity:  0.3,
-  hemiSky:           new THREE.Color(0xb6d0e8),
+  hemiSky:           new THREE.Color(0x90b8e8),  // was 0xb6d0e8 — deeper blue sky dome
   hemiGround:        new THREE.Color(0xa08868),
   hemiIntensity:     0.55,
   bulbIntensity:     0,
@@ -560,6 +739,22 @@ function setDayNight(toDay) {
   clickSound.play();
   if (toDay === isDayMode) return;
   isDayMode = toDay;
+
+  // Whiteboard shadow: cast + receive sunlight shadows in day, suppress both at night.
+  // When switching to day, force the directional shadow map to re-render so the
+  // pre-baked night map is replaced with one that projects shadows onto the whiteboard.
+  // Traverse children so multi-mesh whiteboards are fully covered, not just the parent.
+  if (whiteboardShadow) {
+    whiteboardShadow.traverse((child) => {
+      if (child.isMesh) {
+        child.receiveShadow = toDay;
+        child.castShadow    = toDay;
+      }
+    });
+    if (toDay) {
+      moonFill.shadow.needsUpdate = true;
+    }
+  }
 
   const to = toDay ? DAY_PALETTE : NIGHT_PALETTE;
 
@@ -665,69 +860,149 @@ composer.addPass(outlinePass);
 const outputPass = new OutputPass();
 composer.addPass(outputPass);
 
-// Raycaster + clickable registry for pointer interactions
+// Raycaster + clickable registry for pointer interactions.
+//
+// clickableObjects holds the *real* meshes/groups in the scene that respond to
+// clicks (BMO, whiteboard, bed, etc.). Some of those are deep, high-poly
+// hierarchies — raycasting recursively into them on every pointermove was
+// burning thousands of triangle/ray tests per mouse wiggle.
+//
+// interactionBoundingBoxes is a parallel array of cheap, invisible BoxGeometry
+// proxies (one per clickable) sized to each target's world AABB. We raycast
+// against these proxies non-recursively in both pointermove + pointerdown,
+// then look up the real target via proxy.userData.clickableTarget. Result:
+// O(N proxies) instead of O(triangles) per hover, with identical UX.
 const clickableObjects = [];
+const interactionBoundingBoxes = [];
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-// resolveClickable — walks up the parent chain to find the registered clickable ancestor
-function resolveClickable(obj) {
-  let current = obj;
-  while (current) {
-    if (clickableObjects.indexOf(current) !== -1) return current;
-    current = current.parent;
-  }
-  return obj;
+// registerClickable — adds a target to clickableObjects AND builds an AABB
+// proxy box for fast raycasting. Idempotent: re-registering an existing target
+// is a no-op (so the BMO-focus path that re-adds the screen mesh is safe).
+function registerClickable(target) {
+  if (!target || clickableObjects.indexOf(target) !== -1) return;
+  clickableObjects.push(target);
+
+  const aabb = new THREE.Box3().setFromObject(target);
+  if (aabb.isEmpty()) return; // nothing to proxy (no geometry under this node)
+
+  const size   = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  aabb.getSize(size);
+  aabb.getCenter(center);
+
+  // BoxGeometry throws on zero-sized dims — clamp to a tiny minimum.
+  const sx = Math.max(size.x, 0.01);
+  const sy = Math.max(size.y, 0.01);
+  const sz = Math.max(size.z, 0.01);
+
+  const proxy = new THREE.Mesh(
+    new THREE.BoxGeometry(sx, sy, sz),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  proxy.position.copy(center);
+  proxy.matrixAutoUpdate = false;
+  proxy.updateMatrix();
+  proxy.userData.clickableTarget = target;
+  // Keep proxies out of the rendered scene graph as cheaply as possible:
+  // invisible material + no shadows + frustumCulled still applies for raycasts.
+  proxy.castShadow = false;
+  proxy.receiveShadow = false;
+  scene.add(proxy);
+  interactionBoundingBoxes.push(proxy);
 }
 
-// pointerdown — handles clicks on clickable objects: switch, TV screen, BMO, bed, others
+// unregisterClickable — removes a target from both arrays and disposes its proxy.
+function unregisterClickable(target) {
+  const idx = clickableObjects.indexOf(target);
+  if (idx !== -1) clickableObjects.splice(idx, 1);
+
+  const proxyIdx = interactionBoundingBoxes.findIndex(
+    p => p.userData.clickableTarget === target
+  );
+  if (proxyIdx !== -1) {
+    const proxy = interactionBoundingBoxes[proxyIdx];
+    interactionBoundingBoxes.splice(proxyIdx, 1);
+    scene.remove(proxy);
+    proxy.geometry.dispose();
+    proxy.material.dispose();
+  }
+}
+
+// pointerdown — handles clicks on clickable objects: switch, TV screen, BMO, bed, others.
+// Raycast hits a proxy from interactionBoundingBoxes; the real clickable is in userData.
+// Gated on appReady so clicks during title / picker / loading phases are ignored.
 window.addEventListener('pointerdown', (event) => {
-  if (pickerOverlay.style.pointerEvents !== 'none') return;
+  if (!appReady) return;
 
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(clickableObjects, true);
+  const intersects = raycaster.intersectObjects(interactionBoundingBoxes, false);
 
   if (intersects.length > 0) {
-    const hit = intersects[0].object;
-    const selected = resolveClickable(hit);
+    const selected = intersects[0].object.userData.clickableTarget;
 
-    let switchAncestor = hit;
-    while (switchAncestor) {
-      if (switchAncestor.name === 'Object_0003_1' ||
-          switchAncestor.name === 'switch' ||
-          switchAncestor.name === 'Switch') {
-        
-        setDayNight(!isDayMode);
-        return;
-      }
-      switchAncestor = switchAncestor.parent;
+    // Switch detection: compare against the registered clickable directly —
+    // no parent-chain walk needed since the proxy already resolves to it.
+    if (selected === switchMesh ||
+        selected.name === 'Object_0003_1' ||
+        selected.name === 'switch' ||
+        selected.name === 'Switch') {
+      setDayNight(!isDayMode);
+      return;
     }
 
     if (selected === ukulele) {
       ukeSound.currentTime = 0;
       ukeSound.play();
-
     }
 
-    if (selected === tvScreenMesh) {
-      if (!isFocusedOnBMO) {
-        console.log('Focus on BMO first before playing video.');
-        if (bmoObject) {
-          isFocusedOnBMO = true;
-          selectedObject = bmoObject;
-          outlinePass.selectedObjects = [bmoObject];
-          focusOnObject(bmoObject);
+    if (selected === bmoObject || selected.name === 'leftArm002_8') {
+      // If BMO is already focused, a second click on his body plays the video
+      if (isFocusedOnBMO && !isFocusingObject) {
+        if (!videoReady || !tvVideo) {
+          console.log('Video is not ready yet.');
+          return;
+        }
+        if (isVideoPlaying) {
+          console.log('Video is already playing.');
+          return;
+        }
+        if (tvVideo.paused) {
+          hasOpenedStaticScreen = false;
+          isVideoPlaying = true;
+          tvVideo.currentTime = 0;
+          tvVideo.muted = false;
+          tvVideo.volume = 0.8;
+          tvVideo.play().catch((err) => {
+            console.warn('Video play failed:', err);
+            isVideoPlaying = false;
+          });
         }
         return;
       }
+      // First click — focus on BMO and start loading the video
+      isFocusedOnBMO = true;
+      selectedObject = selected;
+      outlinePass.selectedObjects = [selected];
+      console.log('BMO focused:', selected.name);
+      if (window._loadBMOVideo) window._loadBMOVideo();
+      // Enable screen hover + click now that BMO is focused (creates a proxy too)
+      if (tvScreenMesh) registerClickable(tvScreenMesh);
+      focusOnObject(selected);
+      return;
+    }
+
+    // Screen click — only reachable after BMO is focused (screen registered above)
+    if (selected === tvScreenMesh) {
       if (!videoReady || !tvVideo) {
         console.log('Video is not ready yet.');
         return;
       }
       if (isVideoPlaying) {
-        console.log('Video is already playing, ignoring click.');
+        console.log('Video is already playing.');
         return;
       }
       if (tvVideo.paused) {
@@ -744,17 +1019,6 @@ window.addEventListener('pointerdown', (event) => {
       return;
     }
 
-    if (selected === bmoObject || selected.name === 'leftArm002_8') {
-      isFocusedOnBMO = true;
-      selectedObject = selected;
-      outlinePass.selectedObjects = [selected];
-      console.log('BMO focused:', selected.name);
-      // Start fetching the video now (first time only) so it's ready when the screen is clicked.
-      if (window._loadBMOVideo) window._loadBMOVideo();
-      focusOnObject(selected);
-      return;
-    }
-
     if (selected === mcbed) {
       tipBar.innerText = isDayMode
         ? 'Sorry, you can only sleep at night'
@@ -767,17 +1031,25 @@ window.addEventListener('pointerdown', (event) => {
     }
 
     isFocusedOnBMO = false;
+    // Tear down the screen's proxy + clickable entry — BMO is no longer focused
+    if (tvScreenMesh) unregisterClickable(tvScreenMesh);
     selectedObject = selected;
     outlinePass.selectedObjects = [selected];
     console.log('Clicked Object Name:', selected.name, '| Object Type:', selected.type);
     focusOnObject(selected);
   } else {
     isFocusedOnBMO = false;
+    if (tvScreenMesh) unregisterClickable(tvScreenMesh);
     outlinePass.selectedObjects = [];
   }
 });
 
-// processPointerHover — throttled hover raycaster, runs once per animation frame
+// processPointerHover — throttled hover raycaster, runs once per animation frame.
+// Now raycasts against interactionBoundingBoxes (small invisible AABB proxies)
+// instead of the real clickableObjects hierarchy. Recursion is explicitly off:
+// each proxy is a single 12-tri box, so a hover is at most N box tests where
+// N is the number of registered clickables (~6). Previously this could chew
+// through thousands of triangles per mouse wiggle.
 let pendingPointerEvent = null;
 let pointerRaycastQueued = false;
 
@@ -790,11 +1062,11 @@ function processPointerHover() {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(clickableObjects, true);
+  const intersects = raycaster.intersectObjects(interactionBoundingBoxes, false);
 
   if (intersects.length > 0) {
     document.body.style.cursor = 'pointer';
-    outlinePass.selectedObjects = [resolveClickable(intersects[0].object)];
+    outlinePass.selectedObjects = [intersects[0].object.userData.clickableTarget];
   } else {
     document.body.style.cursor = 'default';
     outlinePass.selectedObjects = [];
@@ -809,13 +1081,16 @@ window.addEventListener('pointermove', (event) => {
   }
 });
 
-// GLTFLoader — loads the main scene GLB, sets up meshes, lights, and screen
+// GLTFLoader — loads the main scene GLB, sets up meshes, lights, and screen.
+// Wrapped in startSceneLoad() so the GLB fetch only fires after the user
+// explicitly picks the 3D experience from the picker.
 const loader = new GLTFLoader();
 
 // please never remove, this allows it to even load in browsers
 loader.setDRACOLoader(dracoLoader);
 
-loader.load(
+function startSceneLoad() {
+  loader.load(
   '/backupisometricScene.glb',
   (gltf) => {
     const model = gltf.scene;
@@ -996,26 +1271,54 @@ loader.load(
     moonFill.castShadow = true;
     moonFill.shadow.needsUpdate = true;
 
-    // Register clickable objects from the loaded model
+    // Register clickable objects from the loaded model.
+    // Each registerClickable() also builds an AABB proxy in interactionBoundingBoxes.
     ukulele = model.getObjectByName('ukulele');
-    if (ukulele) clickableObjects.push(ukulele);
+    if (ukulele) registerClickable(ukulele);
     const bmoMesh   = model.getObjectByName('leftArm002_8');
     bmoObject = bmoMesh;
     const whiteboard = model.getObjectByName('Whiteboard');
     whiteboardShadow = whiteboard;
+  
+
+    // Pre-warm BOTH whiteboard shadow program variants up front.
+    //
+
+    if (whiteboardShadow) {
+      // Variant A — day state (shadows on)
+      whiteboardShadow.traverse((child) => {
+        if (child.isMesh) {
+          child.receiveShadow = true;
+          child.castShadow    = true;
+     
+          
+        }
+      });
+      renderer.compile(scene, camera);
+
+      // Variant B — night state (shadows off, also the initial mode)
+      whiteboardShadow.traverse((child) => {
+        if (child.isMesh) {
+          child.receiveShadow = false;
+          child.castShadow    = false;
+        }
+      });
+      renderer.compile(scene, camera);
+    }
+
     const bed        = model.getObjectByName('Cube016_1');
     const pokeball   = model.getObjectByName('Pokeball');
-    clickableObjects.push(pokeball);
+    if (pokeball) registerClickable(pokeball);
     mcbed = bed;
-    if (bmoMesh) clickableObjects.push(bmoMesh);
-    clickableObjects.push(whiteboard);
-    clickableObjects.push(bed);
+    if (bmoMesh) registerClickable(bmoMesh);
+    if (whiteboard) registerClickable(whiteboard);
+    if (bed) registerClickable(bed);
 
-    const switchMesh = model.getObjectByName('Object_0003_1')
-                    || model.getObjectByName('switch')
-                    || model.getObjectByName('Switch');
+    switchMesh = model.getObjectByName('Object_0003_1')
+              || model.getObjectByName('switch')
+              || model.getObjectByName('Switch');
     if (switchMesh) {
-      clickableObjects.push(switchMesh);
+      registerClickable(switchMesh);
     } else {
       console.warn('Day/night switch mesh not found in the GLB — toggle disabled.');
     }
@@ -1025,7 +1328,7 @@ loader.load(
                        || model.getObjectByName('Pokeball')
                        || model.getObjectByName('PokeBall');
     if (pokeballGroup) {
-      clickableObjects.push(pokeballGroup);
+      registerClickable(pokeballGroup);
     } else {
       console.warn('No object named "pokeball" found in the GLB.');
     }
@@ -1084,7 +1387,9 @@ loader.load(
 
       tvScreenMesh = screen;
       tvVideo = video;
-      clickableObjects.push(screen);
+      // screen is intentionally NOT added to clickableObjects at load — hover
+      // and click on the screen mesh are gated behind BMO focus. Interaction
+      // before focus is handled entirely through BMO's body (leftArm002_8).
 
       const g = screen.geometry;
       g.computeBoundingBox();
@@ -1093,31 +1398,59 @@ loader.load(
       screen.scale.set(1, 1, 1);
       screen.position.add(centerLocal);
 
-      const cvs = document.createElement('canvas');
-      cvs.width = 512;
-      cvs.height = 384;
-      const ctx = cvs.getContext('2d');
-
-      const tex = new THREE.CanvasTexture(cvs);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.minFilter = THREE.LinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-      tex.generateMipmaps = false;
-
       normalizeMeshUVs(screen);
 
-      screen.material = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+      // --- VideoTexture pipeline (replaces the old canvas blitter) ---
+      //
+      // The previous implementation drew each <video> frame onto a 512×384
+      // <canvas>, then flipped tex.needsUpdate every frame. That meant a full
+      // CPU readback of the decoded video frame + a fresh GPU texture upload
+      // *every render tick* — wasted work, since WebGL can sample directly
+      // from a <video> element via HTMLVideoElement-backed texImage2D.
+      //
+      // THREE.VideoTexture wires this up: while the video is playing, the
+      // texture re-uploads the current frame automatically (using whatever
+      // the platform fast-path is — typically zero-copy on Apple/Chrome).
+      // The animate() loop no longer has to touch the screen at all, which
+      // is why updateTV stays null below.
+      //
+      // For the "video ended → mint screen → zoom out" handoff we still need
+      // a solid-color surface. Rather than re-routing through a canvas, we
+      // keep a tiny 4×4 CanvasTexture and swap material.map between the two.
+      // Swapping textures (with material.needsUpdate = true) is cheap — three
+      // doesn't recompile programs for a map texture change, only re-binds.
+      const videoTex = new THREE.VideoTexture(video);
+      videoTex.colorSpace     = THREE.SRGBColorSpace;
+      videoTex.minFilter      = THREE.LinearFilter;
+      videoTex.magFilter      = THREE.LinearFilter;
+      videoTex.generateMipmaps = false;
 
-      ctx.fillStyle = '#c9f4df';
-      ctx.fillRect(0, 0, cvs.width, cvs.height);
-      tex.needsUpdate = true;
+      const solidCvs = document.createElement('canvas');
+      solidCvs.width = 4;
+      solidCvs.height = 4;
+      const solidCtx = solidCvs.getContext('2d');
+      solidCtx.fillStyle = '#c9f4df';
+      solidCtx.fillRect(0, 0, 4, 4);
+      const solidTex = new THREE.CanvasTexture(solidCvs);
+      solidTex.colorSpace     = THREE.SRGBColorSpace;
+      solidTex.minFilter      = THREE.LinearFilter;
+      solidTex.magFilter      = THREE.LinearFilter;
+      solidTex.generateMipmaps = false;
 
-      // setBMOScreenSolidColor — fills the screen canvas with a solid color
+      const screenMaterial = new THREE.MeshBasicMaterial({ map: solidTex, toneMapped: false });
+      screen.material = screenMaterial;
+
+      // setBMOScreenSolidColor — repaint the 4×4 solid texture and swap it in.
+      // Kept as the same external API the rest of the file already calls.
       function setBMOScreenSolidColor(color = '#c9f4df') {
         screenMode = 'solid';
-        ctx.fillStyle = color;
-        ctx.fillRect(0, 0, cvs.width, cvs.height);
-        tex.needsUpdate = true;
+        solidCtx.fillStyle = color;
+        solidCtx.fillRect(0, 0, 4, 4);
+        solidTex.needsUpdate = true;
+        if (screenMaterial.map !== solidTex) {
+          screenMaterial.map = solidTex;
+          screenMaterial.needsUpdate = true;
+        }
       }
 
       video.addEventListener('canplay', () => {
@@ -1128,18 +1461,16 @@ loader.load(
         console.error('Video failed to load:', video.error);
       });
 
-      // drawIdleFrame — seeks to frame 2 and snapshots it as the idle screen image
+      // Once the video has actually decoded a frame after the initial seek,
+      // swap the screen over to the VideoTexture. The texture will then show
+      // the still frame as the idle image until the user clicks play.
       video.addEventListener('seeked', () => {
         if (video.paused && !isVideoPlaying) {
-          const W = cvs.width, H = cvs.height;
-          const vw = video.videoWidth, vh = video.videoHeight;
-          if (!vw || !vh) return;
-          const s = Math.min(W / vw, H / vh);
-          const w = vw * s, h = vh * s;
-          ctx.fillStyle = '#c9f4df';
-          ctx.fillRect(0, 0, W, H);
-          ctx.drawImage(video, (W - w) / 2, (H - h) / 2, w, h);
-          tex.needsUpdate = true;
+          screenMode = 'video';
+          if (screenMaterial.map !== videoTex) {
+            screenMaterial.map = videoTex;
+            screenMaterial.needsUpdate = true;
+          }
         }
       }, { once: true });
 
@@ -1155,35 +1486,8 @@ loader.load(
       // Expose so the BMO click handler (outside this closure) can trigger it.
       window._loadBMOVideo = loadVideo;
 
-      // drawVideoFrameToCanvas — blits the current video frame onto the screen canvas texture
-      function drawVideoFrameToCanvas() {
-        if (screenMode === 'solid') return;
-        if (video.paused) return;
-        if (!video.videoWidth || !video.videoHeight) return;
-        if (video.readyState < video.HAVE_CURRENT_DATA) return;
-
-        const W = cvs.width, H = cvs.height;
-        const vw = video.videoWidth, vh = video.videoHeight;
-        const s = Math.min(W / vw, H / vh);
-        const w = vw * s, h = vh * s;
-        const dx = (W - w) / 2, dy = (H - h) / 2;
-
-        ctx.fillStyle = '#c9f4df';
-        ctx.fillRect(0, 0, W, H);
-        ctx.drawImage(video, dx, dy, w, h);
-        tex.needsUpdate = true;
-      }
-
-      if (typeof video.requestVideoFrameCallback === 'function') {
-        const onFrame = () => {
-          drawVideoFrameToCanvas();
-          video.requestVideoFrameCallback(onFrame);
-        };
-        video.requestVideoFrameCallback(onFrame);
-        updateTV = null;
-      } else {
-        updateTV = drawVideoFrameToCanvas;
-      }
+      // No per-frame TV update needed — VideoTexture handles it natively.
+      updateTV = null;
     }
 
     const leftLeg =
@@ -1250,9 +1554,13 @@ loader.load(
     const tip   = loadingScreen.querySelector('.loading-tip');
     if (title) title.textContent = 'failed to load scene';
     if (tip)   tip.textContent   = 'check the console';
-    clearInterval(loadingTipInterval);
+    if (loadingTipInterval) {
+      clearInterval(loadingTipInterval);
+      loadingTipInterval = null;
+    }
   }
 );
+}
 
 // FPS logger — small overlay in the top-left corner showing live frame rate
 const fpsDisplay = document.createElement('div');
@@ -1272,7 +1580,7 @@ fpsDisplay.style.cssText = `
   border: 1px solid rgba(201,244,223,0.25);
 `;
 fpsDisplay.textContent = 'FPS: --';
-document.body.appendChild(fpsDisplay);
+// document.body.appendChild(fpsDisplay);
 
 let fpsFrameCount = 0;
 let fpsLastTime = performance.now();
@@ -1429,6 +1737,9 @@ window.addEventListener('keydown', (event) => {
     isEscapeAnimating = true;
     lastEscapeTime = performance.now();
     controls.enabled = false;
+    // Tear down the screen's proxy + clickable entry when escaping back to default view
+    isFocusedOnBMO = false;
+    if (tvScreenMesh) unregisterClickable(tvScreenMesh);
     animateEscape();
   }
 });

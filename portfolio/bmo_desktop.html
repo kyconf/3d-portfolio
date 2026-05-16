@@ -738,9 +738,9 @@ document.addEventListener('keydown', (event) => {
 
       setTimeout(() => {
         document.getElementById('browserLoading').style.display = 'none';
-        iframe.src = '2d-website/front.html'; 
+        iframe.src = '2d-website/front.html';
         iframe.style.display = 'block';
-        
+
         // Ensure the new page is focused for its internal JS
         iframe.onload = () => iframe.contentWindow.focus();
       }, 800);
