@@ -2075,6 +2075,9 @@ function showStaticScreen() {
     isVideoPlaying = false;
   }
   navCover.style.opacity = '1';
+
+
+
   setTimeout(() => {
     // Navigate to the .html path, not the clean /bmo_desktop URL. The clean
     // URL only resolves on Vercel (via vercel.json cleanUrls) — Vite's dev
