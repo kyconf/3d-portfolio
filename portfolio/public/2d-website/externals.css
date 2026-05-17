@@ -453,6 +453,7 @@ background-color: white;
     border-right: 1px solid var(--gray);
     border-left: 1px solid var(--gray);
     transition: 0.2s;
+    cursor: pointer;
 }
 
 .nav-item.active {

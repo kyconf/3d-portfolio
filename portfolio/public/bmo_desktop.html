@@ -530,10 +530,13 @@ body {
 // "screen has finished turning on" event so they stay in sync — the video
 // starts blinking right as your eyes finish adjusting.
 
-if (window.location.pathname.endsWith('.html')) {
-    const cleanPath = window.location.pathname.replace('bmo_desktop.html', '2d');
-    window.history.replaceState(null, '', cleanPath);
-}
+// URL bar cleanup is left to Vercel's cleanUrls rule (vercel.json), which
+// 301s /bmo_desktop.html → /bmo_desktop before this script ever runs. In dev
+// and `vite preview` there's no cleanUrls equivalent, so the .html stays in
+// the address bar — that's fine: the path actually serves the file, so
+// reload + share-link both work. The previous rewrite to /2d only changed
+// the address bar; reloading from /2d hit the SPA fallback and showed the
+// 3D title screen instead of the BMO desktop.
 
 (function cleanupFlash(){
   const flash = document.getElementById('screenFlash');
@@ -706,47 +709,15 @@ function openBrowser(){
   setTimeout(()=>{
     document.getElementById('browserLoading').style.display='none';
     const iframe=document.getElementById('browserIframe');
-    iframe.src='/2d-website/pixel_desktop.html';
+    iframe.src='/2d-website/front.html';
     iframe.style.display='block';
+    iframe.onload=()=>iframe.contentWindow.focus();
   },1200);
 
 
 
 }
 
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') {
-    const browserWin = document.getElementById('browserWindow');
-    const iframe = document.getElementById('browserIframe');
-    
-    // CASE 1: Browser is open but NOT maximized yet
-    if (!browserWin.classList.contains('win-hidden') && !browserWin.classList.contains('maximized')) {
-      console.log('Step 1: Maximizing Portfolio...');
-      browserWin.classList.add('maximized');
-      
-      // Hide the terminal so the "OS" feels like it's focusing the app
-      document.getElementById('terminalWindow').classList.add('win-hidden');
-    } 
-    
-    // CASE 2: Browser is already maximized, now switch the content
-    else if (browserWin.classList.contains('maximized')) {
-      console.log('Step 2: Switching to Portfolio Page...');
-      
-      // Show loading spinner again for that "OS" effect
-      document.getElementById('browserLoading').style.display = 'flex';
-      iframe.style.display = 'none';
-
-      setTimeout(() => {
-        document.getElementById('browserLoading').style.display = 'none';
-        iframe.src = '/2d-website/front.html';
-        iframe.style.display = 'block';
-
-        // Ensure the new page is focused for its internal JS
-        iframe.onload = () => iframe.contentWindow.focus();
-      }, 800);
-    }
-  }
-});
 
 function closeWindow(name){
   if(name==='terminal'){

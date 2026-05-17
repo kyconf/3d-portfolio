@@ -10,6 +10,24 @@ import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUnifo
 import { RectAreaLightHelper } from 'three/addons/helpers/RectAreaLightHelper.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
+// bfcache guard — when the user navigates from here to the 2D site and then
+// hits browser back, the page is restored from bfcache with a half-dead WebGL
+// context (only the bulb paints, the rest of the room is gone). We only want
+// the reload-to-root behavior for that specific flow, NOT for the BMO desktop
+// round-trip (clicking BMO's screen → /bmo_desktop → back), which would
+// otherwise also trip pageshow.persisted and force an unwanted refresh.
+//
+// To scope this, the 2D-site navigation sets a sessionStorage flag below.
+// Here, we only act on a bfcache restore (event.persisted === true) AND only
+// when that flag is set, then clear it. Initial loads (persisted=false) and
+// all other bfcache restores are left alone.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted && sessionStorage.getItem('reload3DOnReturn') === '1') {
+    sessionStorage.removeItem('reload3DOnReturn');
+    window.location.replace('/');
+  }
+});
+
 // Draco loader — points to decoder files served from /public/draco/
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('/draco/');
@@ -18,6 +36,10 @@ RectAreaLightUniformsLib.init();
 // audio fx
 const clickSound = new Audio('/on.wav');
 const ukeSound = new Audio('/uke.wav');
+const ambientSound = new Audio('/ambience.mp3');
+// const clickSound2 = new Audio('/whoosh.wav')
+const zoomIn = new Audio('/whoosh.wav')
+const zoomOut = new Audio('/zoomout.wav')
 // Scene + shared state
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a1530);
@@ -44,7 +66,7 @@ const focusPresets = {
   },
   leftArm002_8: {
     cameraOffset: new THREE.Vector3(2.048, 0.229, -0.022),
-    targetOffset: new THREE.Vector3(0.000, 0.15, 0.000)
+    targetOffset: new THREE.Vector3(0.000, 0.10, 0.000)
   }
 };
 
@@ -409,6 +431,11 @@ titleScreen.addEventListener('click', () => {
 pick3dBtn.addEventListener('click', () => {
   if (isMobile) return;                   // hard guard, also covered by `disabled`
   closePicker();
+  // Start ambient music — loop forever, kick off inside the click handler so
+  // the browser's autoplay policy is satisfied (user gesture required).
+  ambientSound.loop = true;
+  ambientSound.volume = 0.3;
+  ambientSound.play().catch(err => console.warn('ambient audio blocked:', err));
   // Mount + show the loading overlay, start cycling tips, and fire the GLB fetch.
   document.body.appendChild(loadingScreen);
   startLoadingTipCycle();
@@ -416,6 +443,10 @@ pick3dBtn.addEventListener('click', () => {
 });
 
 pick2dBtn.addEventListener('click', () => {
+  // Mark this navigation as a 2D-site jump so the pageshow handler at the top
+  // of the file knows to hard-reload when the user comes back via bfcache.
+  // Without this, bfcache restores the 3D page with a broken WebGL context.
+  sessionStorage.setItem('reload3DOnReturn', '1');
   pickerOverlay.style.opacity = '0';
   setTimeout(() => {
     window.location.href = '/2d-website/front.html';
@@ -632,7 +663,7 @@ moonFill.shadow.autoUpdate = false;
 // costs 6× as much as a directional light. The bulb sits at y=2 in a small
 // isometric room (~5×5×3); tightening near/far cuts depth-precision waste and
 // gives us crisper, cheaper shadow samples.
-const bulbLight = new THREE.PointLight(0xffd9a0, 5, 8, 1);
+const bulbLight = new THREE.PointLight(0xffd9a0, 4, 8, 1);
 bulbLight.position.set(0.5, 2, 0.5);
 bulbLight.castShadow = true;
 bulbLight.shadow.mapSize.width  = 1024;
@@ -732,6 +763,58 @@ const DAY_PALETTE = {
   deskLampIntensity: 0,
 };
 
+
+const paperMaterial = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+    uSpeed: { value: 10.0 },    // How fast it flutters
+    uStrength: { value: 0.11 }, // How far it bends out
+  },
+  vertexShader: /* glsl */`
+    uniform float uTime;
+    uniform float uSpeed;
+    uniform float uStrength;
+    varying vec2 vUv;
+
+    void main() {
+      vUv = uv;
+      vec3 pos = position;
+
+      // uv.y goes from 0 (bottom tip) to 1 (top attached edge)
+      // (1.0 - uv.y) means 0 influence at the top anchor, 1.0 at the loose tip
+      float windWeight = pow(1.0 - uv.y, 2.0);
+
+      // Create a high-frequency fluttering motion along the Z/X axis
+      float flutter = sin(pos.y * 10.0 + uTime * uSpeed) * cos(uTime * uSpeed * 0.5);
+      
+      // Push the paper outward in the direction of the AC blast (e.g., Z axis)
+      pos.z += flutter * uStrength * windWeight;
+      
+      // Add a slight constant lift from the continuous air stream
+      pos.y += windWeight * (uStrength * 0.5);
+
+      gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(pos, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    varying vec2 vUv;
+    void main() {
+      // Clean, flat, unlit paper look (matching a stylized room)
+      gl_FragColor = vec4(0.45, 0.52, 0.49, 1.0);
+    }
+  `,
+  side: THREE.DoubleSide
+});
+
+// Give it 1 horizontal segment, but 10-20 vertical segments so it has joints to flex!
+const paperGeo = new THREE.PlaneGeometry(0.05, 0.3, 1, 15);
+const paperMesh = new THREE.Mesh(paperGeo, paperMaterial);
+
+// Position it right at your AC vent opening
+paperMesh.position.set(0.5, 1.2, -1.8); 
+scene.add(paperMesh);
+
+
 // setDayNight — smoothstep-lerps all lights and beam shader between day and night palettes
 function setDayNight(toDay) {
 
@@ -827,6 +910,27 @@ let lastFocusTime = 0;
 const focusCameraPosition = new THREE.Vector3();
 const focusControlsTarget = new THREE.Vector3();
 
+// BMO parallax — spring-based mouse-driven camera drift when focused on BMO.
+// Uses a second-order spring so the camera builds velocity before arriving
+// (small delay, then drifts in fast) rather than a simple lerp.
+//
+// STIFFNESS — how hard the spring pulls toward the target. Higher = faster.
+// DAMPING   — friction that prevents oscillation. Lower = more floaty/overshoot.
+const mouseNDC = new THREE.Vector2();
+const bmoParallaxCurrent  = new THREE.Vector3();
+const bmoParallaxVelocity = new THREE.Vector3(); // spring velocity
+const bmoParallaxTarget   = new THREE.Vector3();
+const BMO_PARALLAX_STRENGTH = 0.2;  // max offset in world units
+const BMO_PARALLAX_STIFFNESS = 40;  // spring pull strength
+const BMO_PARALLAX_DAMPING   = 12;  // 2*sqrt(30)≈11 = critical damping, no bounce
+
+window.addEventListener('mousemove', (e) => {
+  mouseNDC.set(
+    (e.clientX / window.innerWidth)  * 2 - 1,
+   -(e.clientY / window.innerHeight) * 2 + 1
+  );
+});
+
 // Post-processing — outline, bloom, and output passes via EffectComposer
 // HalfFloatType render targets use 8 bytes/pixel instead of 16 (FloatType),
 // cutting intermediate buffer memory roughly in half while still supporting HDR bloom.
@@ -863,23 +967,16 @@ composer.addPass(outputPass);
 // Raycaster + clickable registry for pointer interactions.
 //
 // clickableObjects holds the *real* meshes/groups in the scene that respond to
-// clicks (BMO, whiteboard, bed, etc.). Some of those are deep, high-poly
-// hierarchies — raycasting recursively into them on every pointermove was
-// burning thousands of triangle/ray tests per mouse wiggle.
+// clicks (BMO, whiteboard, bed, etc.)
 //
-// interactionBoundingBoxes is a parallel array of cheap, invisible BoxGeometry
-// proxies (one per clickable) sized to each target's world AABB. We raycast
-// against these proxies non-recursively in both pointermove + pointerdown,
-// then look up the real target via proxy.userData.clickableTarget. Result:
-// O(N proxies) instead of O(triangles) per hover, with identical UX.
+
 const clickableObjects = [];
 const interactionBoundingBoxes = [];
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 // registerClickable — adds a target to clickableObjects AND builds an AABB
-// proxy box for fast raycasting. Idempotent: re-registering an existing target
-// is a no-op (so the BMO-focus path that re-adds the screen mesh is safe).
+
 function registerClickable(target) {
   if (!target || clickableObjects.indexOf(target) !== -1) return;
   clickableObjects.push(target);
@@ -936,6 +1033,8 @@ function unregisterClickable(target) {
 window.addEventListener('pointerdown', (event) => {
   if (!appReady) return;
 
+
+
   const rect = renderer.domElement.getBoundingClientRect();
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -955,6 +1054,12 @@ window.addEventListener('pointerdown', (event) => {
       return;
     }
 
+    // Only play zoom sound if this is a fresh focus (not re-clicking an already focused object)
+    if (selected !== selectedObject) {
+      zoomIn.volume = 0.05;
+      zoomIn.currentTime = 0;
+      zoomIn.play();
+    }
     if (selected === ukulele) {
       ukeSound.currentTime = 0;
       ukeSound.play();
@@ -1250,6 +1355,9 @@ function startSceneLoad() {
     model.position.set(0, 0, 0);
     scene.add(model);
 
+
+
+    
     // Walk up from the BMO mesh to the top-level group that sits directly under
     // the scene root — that's the full BMO object (body, buttons, screen, etc.).
     // All textures in that subtree are protected from downsampling.
@@ -1402,25 +1510,8 @@ function startSceneLoad() {
 
       normalizeMeshUVs(screen);
 
-      // --- VideoTexture pipeline (replaces the old canvas blitter) ---
-      //
-      // The previous implementation drew each <video> frame onto a 512×384
-      // <canvas>, then flipped tex.needsUpdate every frame. That meant a full
-      // CPU readback of the decoded video frame + a fresh GPU texture upload
-      // *every render tick* — wasted work, since WebGL can sample directly
-      // from a <video> element via HTMLVideoElement-backed texImage2D.
-      //
-      // THREE.VideoTexture wires this up: while the video is playing, the
-      // texture re-uploads the current frame automatically (using whatever
-      // the platform fast-path is — typically zero-copy on Apple/Chrome).
-      // The animate() loop no longer has to touch the screen at all, which
-      // is why updateTV stays null below.
-      //
-      // For the "video ended → mint screen → zoom out" handoff we still need
-      // a solid-color surface. Rather than re-routing through a canvas, we
-      // keep a tiny 4×4 CanvasTexture and swap material.map between the two.
-      // Swapping textures (with material.needsUpdate = true) is cheap — three
-      // doesn't recompile programs for a map texture change, only re-binds.
+      // --- VideoTexture pipeline 
+ 
       const videoTex = new THREE.VideoTexture(video);
       videoTex.colorSpace     = THREE.SRGBColorSpace;
       videoTex.minFilter      = THREE.LinearFilter;
@@ -1636,6 +1727,10 @@ function animate() {
 
   if (updateTV) updateTV();
 
+  if (paperMaterial) {
+    paperMaterial.uniforms.uTime.value = performance.now() * 0.001;
+  }
+
   if (window._rig?.leftLeg && window._rig?.rightLeg) {
     const { leftLeg, rightLeg, baseRotL, baseRotR } = window._rig;
     const t = performance.now() * 0.002;
@@ -1646,15 +1741,53 @@ function animate() {
 
   animateObjectFocus();
 
-  if (!isEscapeAnimating && !isFocusingObject) controls.update();
+  // BMO parallax — only active once the camera has fully settled on BMO
+  // (isFocusingObject false) and we're not in the middle of escaping.
+  // Move in camera-local right/up space so the offset is always perpendicular
+  // to the view direction — this prevents any change in camera-to-target
+  // distance (which would read as a zoom).
+  if (isFocusedOnBMO && !isFocusingObject && !isEscapeAnimating) {
+    controls.enabled = false; // hand-drive the camera; no OrbitControls interference
+
+    const dt = Math.min(1 / 30, 1 / 60); // fixed step — good enough for a visual spring
+
+    // Build camera-local axes from the settled focus position
+    const forward = new THREE.Vector3().subVectors(focusControlsTarget, focusCameraPosition).normalize();
+    const right   = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+    const up      = new THREE.Vector3().crossVectors(right, forward).normalize();
+
+    // Target offset in world space, expressed along camera-local right/up
+    bmoParallaxTarget.copy(right).multiplyScalar(mouseNDC.x * BMO_PARALLAX_STRENGTH)
+      .addScaledVector(up, mouseNDC.y * BMO_PARALLAX_STRENGTH * 0.6);
+
+    // Spring physics: acceleration = stiffness*(target-current) - damping*velocity
+    const ax = BMO_PARALLAX_STIFFNESS * (bmoParallaxTarget.x - bmoParallaxCurrent.x) - BMO_PARALLAX_DAMPING * bmoParallaxVelocity.x;
+    const ay = BMO_PARALLAX_STIFFNESS * (bmoParallaxTarget.y - bmoParallaxCurrent.y) - BMO_PARALLAX_DAMPING * bmoParallaxVelocity.y;
+    const az = BMO_PARALLAX_STIFFNESS * (bmoParallaxTarget.z - bmoParallaxCurrent.z) - BMO_PARALLAX_DAMPING * bmoParallaxVelocity.z;
+    bmoParallaxVelocity.x += ax * dt;
+    bmoParallaxVelocity.y += ay * dt;
+    bmoParallaxVelocity.z += az * dt;
+    bmoParallaxCurrent.x  += bmoParallaxVelocity.x * dt;
+    bmoParallaxCurrent.y  += bmoParallaxVelocity.y * dt;
+    bmoParallaxCurrent.z  += bmoParallaxVelocity.z * dt;
+
+    camera.position.copy(focusCameraPosition).add(bmoParallaxCurrent);
+    camera.lookAt(focusControlsTarget);
+  } else {
+    if (!isFocusedOnBMO) {
+      // Reset so there's no pop or leftover momentum when re-focusing later
+      bmoParallaxCurrent.set(0, 0, 0);
+      bmoParallaxVelocity.set(0, 0, 0);
+    }
+    if (!isEscapeAnimating && !isFocusingObject) controls.update();
+  }
 
   const transitioning = isFocusingObject || isEscapeAnimating;
 
   outlinePass.enabled = !transitioning && outlinePass.selectedObjects.length > 0;
 
-  // Disable bloom during camera transitions — it's the heaviest pass and the motion
-  // makes the difference imperceptible. Re-enables the moment the camera settles.
-  if (bloomPass.enabled !== undefined) bloomPass.enabled = !transitioning;
+  // Bloom stays on at all times — including during camera transitions —
+  // so the screen glow is visible during the zoom-in to BMO.
 
   // Always go through the composer so OutputPass handles tone mapping consistently.
   composer.render();
@@ -1690,6 +1823,9 @@ function animateEscape() {
     controls.update();
     isEscapeAnimating = false;
     controls.enabled = true;
+    // Clear focused object so Escape from the default view never re-triggers sounds
+    selectedObject = null;
+    outlinePass.selectedObjects = [];
     return;
   }
 
@@ -1743,6 +1879,12 @@ window.addEventListener('resize', () => {
 // keydown (Escape) — triggers the camera escape animation back to default view
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !isEscapeAnimating && !hasOpenedStaticScreen) {
+    // Only sound if the camera was actually zoomed in on something
+    if (selectedObject !== null || isFocusingObject) {
+      zoomOut.currentTime = 0;
+      zoomOut.volume = 0.07;
+      zoomOut.play();
+    }
     isFocusingObject = false;
     isEscapeAnimating = true;
     lastEscapeTime = performance.now();
@@ -1750,6 +1892,8 @@ window.addEventListener('keydown', (event) => {
     // Tear down the screen's proxy + clickable entry when escaping back to default view
     isFocusedOnBMO = false;
     if (tvScreenMesh) unregisterClickable(tvScreenMesh);
+
+    
     animateEscape();
   }
 });
@@ -1932,7 +2076,13 @@ function showStaticScreen() {
   }
   navCover.style.opacity = '1';
   setTimeout(() => {
-    window.location.href = '/bmo_desktop';
+    // Navigate to the .html path, not the clean /bmo_desktop URL. The clean
+    // URL only resolves on Vercel (via vercel.json cleanUrls) — Vite's dev
+    // server and `vite preview` don't know that rule, so /bmo_desktop falls
+    // back to index.html and you land on the 3D title screen at that URL.
+    // Going through /bmo_desktop.html works everywhere: dev/preview serve the
+    // file directly, and Vercel transparently 301s to /bmo_desktop.
+    window.location.href = '/bmo_desktop.html';
   }, 260);
 }
 
