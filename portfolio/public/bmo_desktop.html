@@ -34,9 +34,9 @@
   top: 0 !important;
   left: 0 !important;
   width: 100vw !important;
-  height: calc(100vh - 36px) !important; 
+  height: calc(100vh - 36px) !important;
   z-index: 99 !important;
-  border-radius: 0;
+  border-radius: 0 !important;
 }
 
   body{
@@ -192,6 +192,11 @@ body {
     z-index:5;
     display:flex;flex-direction:column;
     overflow:hidden;
+    transition: top 0.32s cubic-bezier(.4,0,.2,1),
+                left 0.32s cubic-bezier(.4,0,.2,1),
+                width 0.32s cubic-bezier(.4,0,.2,1),
+                height 0.32s cubic-bezier(.4,0,.2,1),
+                border-radius 0.32s cubic-bezier(.4,0,.2,1);
   }
   .titlebar{
     display:flex;align-items:center;justify-content:space-between;
@@ -711,6 +716,12 @@ function openBrowser(){
   document.getElementById('taskBrowser').classList.remove('task-hidden');
   document.getElementById('browserLoading').style.display='flex';
   document.getElementById('browserIframe').style.display='none';
+
+  // Let the browser paint the small window for one frame, then animate to maximized
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{ bw.classList.add('maximized'); });
+  });
+
   setTimeout(()=>{
     document.getElementById('browserLoading').style.display='none';
     const iframe=document.getElementById('browserIframe');
@@ -718,9 +729,6 @@ function openBrowser(){
     iframe.style.display='block';
     iframe.onload=()=>iframe.contentWindow.focus();
   },1200);
-
-
-
 }
 
 
