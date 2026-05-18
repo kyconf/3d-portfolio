@@ -179,8 +179,9 @@ document.head.appendChild(loadingStyle);
 const loadingTipEl = loadingScreen.querySelector('#loadingTip');
 const loadingTips = [
   'preparing the scene...',
-  'limited edition...',
+  'checking your network...',
   'arranging books...',
+  'may take a few seconds...',
   'tuning the tv...',
   'waking up bmo...',
 ];
@@ -434,7 +435,7 @@ pick3dBtn.addEventListener('click', () => {
   // Start ambient music — loop forever, kick off inside the click handler so
   // the browser's autoplay policy is satisfied (user gesture required).
   ambientSound.loop = true;
-  ambientSound.volume = 0.3;
+  ambientSound.volume = 0.5;
   ambientSound.play().catch(err => console.warn('ambient audio blocked:', err));
   // Mount + show the loading overlay, start cycling tips, and fire the GLB fetch.
   document.body.appendChild(loadingScreen);
@@ -920,8 +921,8 @@ const mouseNDC = new THREE.Vector2();
 const bmoParallaxCurrent  = new THREE.Vector3();
 const bmoParallaxVelocity = new THREE.Vector3(); // spring velocity
 const bmoParallaxTarget   = new THREE.Vector3();
-const BMO_PARALLAX_STRENGTH = 0.2;  // max offset in world units
-const BMO_PARALLAX_STIFFNESS = 40;  // spring pull strength
+const BMO_PARALLAX_STRENGTH = 0.1;  // max offset in world units
+const BMO_PARALLAX_STIFFNESS = 80;  // spring pull strength
 const BMO_PARALLAX_DAMPING   = 12;  // 2*sqrt(30)≈11 = critical damping, no bounce
 
 window.addEventListener('mousemove', (e) => {
@@ -1054,15 +1055,18 @@ window.addEventListener('pointerdown', (event) => {
       return;
     }
 
+    // Ukulele — play the strum sound but skip zoom/focus entirely
+    if (selected === ukulele) {
+      ukeSound.currentTime = 0;
+      ukeSound.play();
+      return;
+    }
+
     // Only play zoom sound if this is a fresh focus (not re-clicking an already focused object)
     if (selected !== selectedObject) {
       zoomIn.volume = 0.05;
       zoomIn.currentTime = 0;
       zoomIn.play();
-    }
-    if (selected === ukulele) {
-      ukeSound.currentTime = 0;
-      ukeSound.play();
     }
 
     if (selected === bmoObject || selected.name === 'leftArm002_8') {
@@ -1235,10 +1239,7 @@ function startSceneLoad() {
 
         if (object.name === 'Cube009_1') object.receiveShadow = false;
         if (object.name === 'Cube016_1') object.receiveShadow = false;
-        if (object.name === 'Plane005') {
-          object.receiveShadow = false;
-          object.castShadow = false;
-        }
+
 
         if (object.material?.map) {
           object.material.map.anisotropy = 2;
@@ -1882,7 +1883,7 @@ window.addEventListener('keydown', (event) => {
     // Only sound if the camera was actually zoomed in on something
     if (selectedObject !== null || isFocusingObject) {
       zoomOut.currentTime = 0;
-      zoomOut.volume = 0.07;
+      zoomOut.volume = 0.05;
       zoomOut.play();
     }
     isFocusingObject = false;
