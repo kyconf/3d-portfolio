@@ -523,6 +523,7 @@ helpBtn.style.cssText = `
   transition: background 0.2s, border-color 0.2s;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  outline: none;
 `;
 helpBtn.addEventListener('mouseenter', () => {
   helpBtn.style.background = 'rgba(61,168,122,0.35)';
@@ -593,6 +594,7 @@ function closeHelp() {
   helpOpen = false;
   helpOverlay.style.opacity = '0';
   helpOverlay.style.pointerEvents = 'none';
+  helpBtn.blur();
 }
 helpBtn.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1879,7 +1881,7 @@ window.addEventListener('resize', () => {
 
 // keydown (Escape) — triggers the camera escape animation back to default view
 window.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !isEscapeAnimating && !hasOpenedStaticScreen) {
+  if (event.key === 'Escape' && !isEscapeAnimating && !hasOpenedStaticScreen && !helpOpen) {
     // Only sound if the camera was actually zoomed in on something
     if (selectedObject !== null || isFocusingObject) {
       zoomOut.currentTime = 0;

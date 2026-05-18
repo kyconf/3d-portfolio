@@ -23,7 +23,7 @@
 
 .typography{
   animation: typewriter 1.5s steps(14) 1s 1 normal both,
-             blinkTextCursor 700ms infinite;
+             blinkTextCursor 1100ms step-end infinite;
 }
 
 
@@ -43,7 +43,7 @@
 
 .typography2{
   animation: typewriter2 2s steps(25) 1s 1 normal both,
-             blinkTextCursor 700ms infinite;
+             blinkTextCursor 1100ms step-end infinite;
 }
 @keyframes typewriter{
   from{width: 0;}
@@ -55,8 +55,8 @@
   to{width: 23ch;}
 }
 @keyframes blinkTextCursor{
-  from{border-right-color: rgba(255,255,255,.75);}
-  to{border-right-color: transparent;}
+  0%, 100% { border-right-color: rgba(255,255,255,.75); }
+  50%       { border-right-color: transparent; }
 }
 
   :root {
@@ -398,7 +398,7 @@
 }
   .typography3{
   animation: typewriter3 2s steps(25) 1s 1 normal both,
-             blinkTextCursor 700ms infinite;
+             blinkTextCursor 1100ms step-end infinite;
 }
 
 /* .navBar {
@@ -605,7 +605,6 @@ background-color: white;
     display: flex;
     flex-direction: column;
     gap: 16px;
-    height: 58vh;
 }
 
 .bio-box {
@@ -645,6 +644,41 @@ background-color: white;
     height: 8px;
     background: var(--green);
     flex-shrink: 0;
+}
+
+/* Origin Story / Biography */
+.origin-box {
+    margin-top: 24px;
+    padding: 24px;
+    background: #1a1a1a;
+}
+
+.origin-chapters {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.origin-chapter {
+    border-left: 2px solid var(--green);
+    padding-left: 16px;
+}
+
+.origin-label {
+    display: block;
+    color: var(--green);
+    font-family: 'Silkscreen', sans-serif;
+    font-size: 9px;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+}
+
+.origin-chapter p {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.9;
+    color: #ccc;
+    margin: 0;
 }
 
 
@@ -770,15 +804,52 @@ background-color: white;
 
 /* Small windows: stack everything vertically */
 @media (max-width: 700px) {
+    /* Layout */
     .content-section {
-        padding: 16px 20px;
+        padding: 16px 14px;
     }
+
+    /* Title bar */
+    #myName {
+        font-size: 3vh;
+    }
+    #desc {
+        font-size: 1.8vh;
+    }
+    .titleName {
+        margin-top: 1vh;
+    }
+
+    /* Nav */
+    .nav-bar {
+        margin-left: 0;
+        width: 100%;
+    }
+    .nav-item {
+        flex: 1;
+        padding: 12px 6px;
+        font-size: 9px;
+        text-align: center;
+        border-left: none;
+        border-right: 1px solid var(--gray);
+        letter-spacing: 0;
+    }
+
+    /* Section title */
+    .section-title {
+        font-size: 16px;
+        margin-bottom: 18px;
+    }
+
+    /* About grid — stack vertically */
     .about-grid {
         flex-direction: column;
         align-items: stretch;
     }
     .profile-card {
         width: 100%;
+        max-width: 340px;
+        margin: 0 auto;
     }
     .profile-card .avatar-img {
         width: 100%;
@@ -786,14 +857,65 @@ background-color: white;
     .about-right {
         width: 100%;
     }
+
+    /* Bio box */
+    .bio-box {
+        font-size: 13px;
+        line-height: 1.7;
+    }
+
+    /* Contact form: single-column */
+    .contact-form-row {
+        grid-template-columns: 1fr;
+    }
+
+    /* Contact cards: 2×2 grid */
     .contact-cards {
         grid-template-columns: repeat(2, 1fr);
     }
+
+    /* Skills: single column */
+    .skills-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Projects */
     .project-title {
         font-size: 1rem;
     }
     .project-desc {
         font-size: 0.8rem;
+    }
+}
+
+/* Phone-size tweaks */
+@media (max-width: 420px) {
+    .nav-item {
+        padding: 10px 4px;
+        font-size: 8px;
+    }
+    .content-section {
+        padding: 12px 10px;
+    }
+    .section-title {
+        font-size: 14px;
+    }
+    .contact-cards {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    .contact-card {
+        padding: 16px 12px;
+    }
+    .contact-value {
+        font-size: 8px;
+    }
+    .bio-box {
+        font-size: 12px;
+    }
+    .tag {
+        font-size: 9px;
+        padding: 4px 10px;
     }
 }
 
