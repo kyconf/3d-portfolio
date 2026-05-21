@@ -9,7 +9,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { RectAreaLightHelper } from 'three/addons/helpers/RectAreaLightHelper.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import Stats from 'stats.js';
 
 // bfcache guard — when the user navigates from here to the 2D site and then
 // hits browser back, the page is restored from bfcache with a half-dead WebGL
