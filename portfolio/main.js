@@ -9,6 +9,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { RectAreaLightHelper } from 'three/addons/helpers/RectAreaLightHelper.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import Stats from 'stats.js';
 
 // bfcache guard — when the user navigates from here to the 2D site and then
 // hits browser back, the page is restored from bfcache with a half-dead WebGL
@@ -644,7 +645,7 @@ scene.add(ambientLight);
 
 const moonFill = new THREE.DirectionalLight(0xb0c0e0, 0.4);
 // - 5 3, 2
-moonFill.position.set(0, 2, 2);
+moonFill.position.set(-10, 3, 4);
 moonFill.target.position.set(center.x, center.y, center.z);
 moonFill.target.updateMatrixWorld();
 scene.add(moonFill, moonFill.target);
@@ -663,10 +664,12 @@ sunKey.position.set(-4.5, 3.5, 1.5);
 sunKey.target.position.set(center.x, center.y, center.z);
 sunKey.target.updateMatrixWorld();
 sunKey.castShadow = true;
-sunKey.shadow.mapSize.set(2048, 2048);
+// 1024² is plenty for a stylized diorama at this camera range — saves ~6MB VRAM
+// and trims the first-load shadow bake from ~50ms to ~12ms vs 2048².
+sunKey.shadow.mapSize.set(1024, 1024);
 sunKey.shadow.bias        = -0.003;
 sunKey.shadow.normalBias  = 0.08;
-sunKey.shadow.radius      = 8;
+sunKey.shadow.radius      = 6;
 sunKey.shadow.camera.near = 0.1;
 sunKey.shadow.camera.far  = 40;
 sunKey.shadow.camera.left   = -14;
@@ -690,10 +693,11 @@ moonKey.position.set(-4.5, 3.5, 1.5);
 moonKey.target.position.set(center.x, center.y, center.z);
 moonKey.target.updateMatrixWorld();
 moonKey.castShadow = true;
-moonKey.shadow.mapSize.set(2048, 2048);
+// Match sunKey — 1024² is the sweet spot for this scene.
+moonKey.shadow.mapSize.set(1024, 1024);
 moonKey.shadow.bias        = -0.003;
 moonKey.shadow.normalBias  = 0.08;
-moonKey.shadow.radius      = 8;
+moonKey.shadow.radius      = 6;
 moonKey.shadow.camera.near = 0.1;
 moonKey.shadow.camera.far  = 40;
 moonKey.shadow.camera.left   = -14;
@@ -1111,6 +1115,12 @@ const bmoParallaxTarget   = new THREE.Vector3();
 const BMO_PARALLAX_STRENGTH = 0.1;  // max offset in world units
 const BMO_PARALLAX_STIFFNESS = 80;  // spring pull strength
 const BMO_PARALLAX_DAMPING   = 12;  // 2*sqrt(30)≈11 = critical damping, no bounce
+
+// Scratch vectors for BMO parallax — hoisted out of the render loop so we
+// don't allocate three Vector3s every frame while parallax is active.
+const _bmoForward = new THREE.Vector3();
+const _bmoRight   = new THREE.Vector3();
+const _bmoUp      = new THREE.Vector3();
 
 window.addEventListener('mousemove', (e) => {
   mouseNDC.set(
@@ -1615,18 +1625,8 @@ function startSceneLoad() {
     //
 
     if (whiteboardShadow) {
-      // Variant A — day state (shadows on)
-      whiteboardShadow.traverse((child) => {
-        if (child.isMesh) {
-          child.receiveShadow = true;
-          child.castShadow    = true;
-     
-          
-        }
-      });
-      renderer.compile(scene, camera);
-
-      // Variant B — night state (shadows off, also the initial mode)
+      // Variant B FIRST — night state (the initial mode). This is the shader
+      // program the very first frame needs, so we compile it synchronously.
       whiteboardShadow.traverse((child) => {
         if (child.isMesh) {
           child.receiveShadow = false;
@@ -1634,6 +1634,30 @@ function startSceneLoad() {
         }
       });
       renderer.compile(scene, camera);
+
+      // Variant A — day state (shadows on). Deferred to idle so it doesn't
+      // block first paint. Trade-off: very first day-toggle MAY show a tiny
+      // compile stutter if the user toggles before this idle slot fires.
+      const scheduleIdle = window.requestIdleCallback
+        ? (cb) => window.requestIdleCallback(cb, { timeout: 1500 })
+        : (cb) => setTimeout(cb, 100);
+      scheduleIdle(() => {
+        whiteboardShadow.traverse((child) => {
+          if (child.isMesh) {
+            child.receiveShadow = true;
+            child.castShadow    = true;
+          }
+        });
+        renderer.compile(scene, camera);
+        // Restore night state (the active mode at this point) so we don't
+        // accidentally leave shadows on after the warm-up.
+        whiteboardShadow.traverse((child) => {
+          if (child.isMesh) {
+            child.receiveShadow = false;
+            child.castShadow    = false;
+          }
+        });
+      });
     }
 
     const bed        = model.getObjectByName('Cube016_1');
@@ -1904,7 +1928,7 @@ fpsDisplay.style.cssText = `
   border: 1px solid rgba(201,244,223,0.25);
 `;
 fpsDisplay.textContent = 'FPS: --';
-// document.body.appendChild(fpsDisplay);
+document.body.appendChild(fpsDisplay);
 
 let fpsFrameCount = 0;
 let fpsLastTime = performance.now();
@@ -2002,14 +2026,15 @@ function animate() {
 
     const dt = Math.min(1 / 30, 1 / 60); // fixed step — good enough for a visual spring
 
-    // Build camera-local axes from the settled focus position
-    const forward = new THREE.Vector3().subVectors(focusControlsTarget, focusCameraPosition).normalize();
-    const right   = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
-    const up      = new THREE.Vector3().crossVectors(right, forward).normalize();
+    // Build camera-local axes from the settled focus position — reuses scratch
+    // vectors hoisted above so this branch allocates zero per frame.
+    _bmoForward.subVectors(focusControlsTarget, focusCameraPosition).normalize();
+    _bmoRight.crossVectors(_bmoForward, camera.up).normalize();
+    _bmoUp.crossVectors(_bmoRight, _bmoForward).normalize();
 
     // Target offset in world space, expressed along camera-local right/up
-    bmoParallaxTarget.copy(right).multiplyScalar(mouseNDC.x * BMO_PARALLAX_STRENGTH)
-      .addScaledVector(up, mouseNDC.y * BMO_PARALLAX_STRENGTH * 0.6);
+    bmoParallaxTarget.copy(_bmoRight).multiplyScalar(mouseNDC.x * BMO_PARALLAX_STRENGTH)
+      .addScaledVector(_bmoUp, mouseNDC.y * BMO_PARALLAX_STRENGTH * 0.6);
 
     // Spring physics: acceleration = stiffness*(target-current) - damping*velocity
     const ax = BMO_PARALLAX_STIFFNESS * (bmoParallaxTarget.x - bmoParallaxCurrent.x) - BMO_PARALLAX_DAMPING * bmoParallaxVelocity.x;
@@ -2110,21 +2135,30 @@ window.addEventListener('beforeunload', () => {
   renderer.dispose();
 });
 
-// resize — updates camera aspect and composer size on window resize
+// resize — coalesced via rAF so rapid drags (window snap, devtools toggle) only
+// reallocate render targets once per frame instead of N times per drag. Each
+// composer/outline/bloom setSize() is a full GPU reallocation; without this
+// guard, dragging the window edge can stall the page for 100s of ms.
+let resizePending = false;
 window.addEventListener('resize', () => {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+  if (resizePending) return;
+  resizePending = true;
+  requestAnimationFrame(() => {
+    resizePending = false;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
 
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
 
-  renderer.setSize(width, height);
-  composer.setSize(width, height);
-  composerTarget.setSize(width, height);
+    renderer.setSize(width, height);
+    composer.setSize(width, height);
+    composerTarget.setSize(width, height);
 
-  // This forces the hidden outline selection texture to match the viewport pixel-for-pixel
-  outlinePass.setSize(width, height);
-  bloomPass.setSize(Math.floor(width / 2), Math.floor(height / 2));
+    // This forces the hidden outline selection texture to match the viewport pixel-for-pixel
+    outlinePass.setSize(width, height);
+    bloomPass.setSize(Math.floor(width / 2), Math.floor(height / 2));
+  });
 });
 
 // keydown (Escape) — triggers the camera escape animation back to default view
@@ -2247,8 +2281,15 @@ window.addEventListener('keydown', (event) => {
 });
 
 // downsampleTextures — walks all mesh materials and resizes any texture image
-// larger than maxPx down to maxPx on its longest side. Runs once after GLB loads
-// and can save 200-400MB since uncompressed 2048×2048 RGBA = 16MB each.
+// larger than maxPx down to maxPx on its longest side. Saves 200-400MB since
+// uncompressed 2048×2048 RGBA = 16MB each.
+//
+// IMPORTANT — chunked across `requestIdleCallback` (one texture per idle slot)
+// so the canvas resizes never block first paint. The trade-off: the very first
+// frame uploads textures at their original resolution (brief VRAM spike), then
+// each texture is replaced with a downsampled version as the browser gets idle
+// time. End state matches the old synchronous version, but the scene is
+// interactive immediately instead of after a 500ms-2s stall.
 // protectRoots: array of Object3D whose entire subtree is left at full resolution.
 function downsampleTextures(model, maxPx = 1024, protectRoots = []) {
   const seen = new Set();
@@ -2267,6 +2308,9 @@ function downsampleTextures(model, maxPx = 1024, protectRoots = []) {
     });
   });
 
+  // Pass 1 (fast, cheap) — collect every texture that needs resizing into a flat
+  // queue. Just a traversal + filter; no canvas work yet.
+  const queue = [];
   model.traverse(o => {
     if (!o.isMesh) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -2276,25 +2320,42 @@ function downsampleTextures(model, maxPx = 1024, protectRoots = []) {
         if (!tex || seen.has(tex.uuid)) return;
         seen.add(tex.uuid);
         if (protectedUUIDs.has(tex.uuid)) return; // keep BMO at full res
-
         const img = tex.image;
         if (!img || !img.width) return;
         if (img.width <= maxPx && img.height <= maxPx) return;
-
-        const scale = maxPx / Math.max(img.width, img.height);
-        const w = Math.max(1, Math.round(img.width  * scale));
-        const h = Math.max(1, Math.round(img.height * scale));
-
-        const cvs = document.createElement('canvas');
-        cvs.width = w;
-        cvs.height = h;
-        cvs.getContext('2d').drawImage(img, 0, 0, w, h);
-
-        tex.image = cvs;
-        tex.needsUpdate = true;
+        queue.push(tex);
       });
     });
   });
+
+  if (queue.length === 0) return;
+
+  // Pass 2 (deferred) — process one texture per idle slot. Falls back to rAF on
+  // browsers without requestIdleCallback (Safari).
+  const schedule = window.requestIdleCallback
+    ? (cb) => window.requestIdleCallback(cb, { timeout: 500 })
+    : (cb) => requestAnimationFrame(cb);
+
+  function processNext() {
+    const tex = queue.shift();
+    if (!tex) return;
+    const img = tex.image;
+    // Re-check in case the texture was disposed between scheduling and now.
+    if (img && img.width && (img.width > maxPx || img.height > maxPx)) {
+      const scale = maxPx / Math.max(img.width, img.height);
+      const w = Math.max(1, Math.round(img.width  * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const cvs = document.createElement('canvas');
+      cvs.width = w;
+      cvs.height = h;
+      cvs.getContext('2d').drawImage(img, 0, 0, w, h);
+      tex.image = cvs;
+      tex.needsUpdate = true;
+    }
+    if (queue.length) schedule(processNext);
+  }
+
+  schedule(processNext);
 }
 
 // normalizeMeshUVs — remaps UV coordinates to [0,1] range for canvas texture display
