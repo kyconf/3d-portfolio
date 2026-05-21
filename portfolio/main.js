@@ -42,7 +42,7 @@ const zoomIn = new Audio('/whoosh.wav')
 const zoomOut = new Audio('/zoomout.wav')
 // Scene + shared state
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a1530);
+scene.background = new THREE.Color(0x5f6163);
 let isVideoPlaying = false;
 let selectedObject = null;
 let tvScreenMesh = null;
@@ -639,15 +639,72 @@ console.log('center:', center);
 const fillLight = new THREE.HemisphereLight(0x2a3a5a, 0x0a0a15, 0.2);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0x6a7a9a, 0.55);
+const ambientLight = new THREE.AmbientLight(0x6a7a9a, 0.15);
 scene.add(ambientLight);
 
 const moonFill = new THREE.DirectionalLight(0xb0c0e0, 0.4);
-moonFill.position.set(-5, 3, 2);
+// - 5 3, 2
+moonFill.position.set(0, 2, 2);
 moonFill.target.position.set(center.x, center.y, center.z);
 moonFill.target.updateMatrixWorld();
 scene.add(moonFill, moonFill.target);
 moonFill.castShadow = false;
+
+// sunKey — warm directional light that mimics late-afternoon sun streaming in
+// through the window. Lives next to moonFill (same target) but rides a separate
+// intensity track so it can be off at night and ramp up at day without polluting
+// the cool moon palette. Tinted golden so daytime feels warm and inviting.
+//
+// Casts shadows in day mode — this is what gives the room its "afternoon" feel
+// (cast shadows of furniture/window on the floor and walls). autoUpdate is off
+// so the shadow map is computed once per day-toggle, not every frame.
+const sunKey = new THREE.DirectionalLight(0xffd49a, 0);
+sunKey.position.set(-4.5, 3.5, 1.5);
+sunKey.target.position.set(center.x, center.y, center.z);
+sunKey.target.updateMatrixWorld();
+sunKey.castShadow = true;
+sunKey.shadow.mapSize.set(2048, 2048);
+sunKey.shadow.bias        = -0.003;
+sunKey.shadow.normalBias  = 0.08;
+sunKey.shadow.radius      = 8;
+sunKey.shadow.camera.near = 0.1;
+sunKey.shadow.camera.far  = 40;
+sunKey.shadow.camera.left   = -14;
+sunKey.shadow.camera.right  =  14;
+sunKey.shadow.camera.top    =  14;
+sunKey.shadow.camera.bottom = -14;
+sunKey.shadow.camera.updateProjectionMatrix();
+sunKey.shadow.autoUpdate = false;
+sunKey.shadow.needsUpdate = true;
+scene.add(sunKey, sunKey.target);
+window._sunKey = sunKey;
+
+// moonKey — directional counterpart to sunKey for night mode. Cool blue tint,
+// same window-side angle, casts shadows through the window frame to give the
+// floor that classic "moonlight through blinds" pattern. Shadow map is pre-baked
+// at load time and only refreshed on day/night toggle (same pattern as sunKey)
+// so it doesn't tank framerate. Intensity rides the day/night palette — 0 in
+// day, lifted at night.
+const moonKey = new THREE.DirectionalLight(0x8aa6d0, 2.4);
+moonKey.position.set(-4.5, 3.5, 1.5);
+moonKey.target.position.set(center.x, center.y, center.z);
+moonKey.target.updateMatrixWorld();
+moonKey.castShadow = true;
+moonKey.shadow.mapSize.set(2048, 2048);
+moonKey.shadow.bias        = -0.003;
+moonKey.shadow.normalBias  = 0.08;
+moonKey.shadow.radius      = 8;
+moonKey.shadow.camera.near = 0.1;
+moonKey.shadow.camera.far  = 40;
+moonKey.shadow.camera.left   = -14;
+moonKey.shadow.camera.right  =  14;
+moonKey.shadow.camera.top    =  14;
+moonKey.shadow.camera.bottom = -14;
+moonKey.shadow.camera.updateProjectionMatrix();
+moonKey.shadow.autoUpdate = false;
+moonKey.shadow.needsUpdate = true;
+scene.add(moonKey, moonKey.target);
+window._moonKey = moonKey;
 moonFill.shadow.mapSize.set(1024, 1024);
 moonFill.shadow.bias        = -0.0005;
 moonFill.shadow.normalBias  = 0.02;
@@ -666,8 +723,8 @@ moonFill.shadow.autoUpdate = false;
 // costs 6× as much as a directional light. The bulb sits at y=2 in a small
 // isometric room (~5×5×3); tightening near/far cuts depth-precision waste and
 // gives us crisper, cheaper shadow samples.
-const bulbLight = new THREE.PointLight(0xffd9a0, 4, 8, 1);
-bulbLight.position.set(0.5, 2, 0.5);
+const bulbLight = new THREE.PointLight(0xffd9a0, 5, 8, 1);
+bulbLight.position.set(0.5, 4.5, 0.5);
 bulbLight.castShadow = true;
 bulbLight.shadow.mapSize.width  = 1024;
 bulbLight.shadow.mapSize.height = 1024;
@@ -732,16 +789,71 @@ window.toggleLampHelper = () => {
 };
 toggleLampHelper();
 
+// Dust motes — small floating particles that catch the sunbeam in day mode.
+// Builds a CanvasTexture once (cheap, ~32×32 radial gradient) for a soft round
+// sprite, then drives ~120 points with sinusoidal drift inside the room bounds.
+// material.opacity is tweened in setDayNight so dust fades in with daylight.
+const DUST_COUNT = 130;
+const dustGeo = new THREE.BufferGeometry();
+const dustPositions  = new Float32Array(DUST_COUNT * 3);
+const dustVelocities = new Float32Array(DUST_COUNT * 3);
+const dustSeeds      = new Float32Array(DUST_COUNT);
+for (let i = 0; i < DUST_COUNT; i++) {
+  dustPositions[i * 3 + 0] = (Math.random() - 0.5) * 3.6;
+  dustPositions[i * 3 + 1] =  Math.random() * 2.6;
+  dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 3.6;
+  dustVelocities[i * 3 + 0] = (Math.random() - 0.5) * 0.04;
+  dustVelocities[i * 3 + 1] =  Math.random() * 0.025 + 0.005;
+  dustVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.04;
+  dustSeeds[i] = Math.random() * Math.PI * 2;
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+
+const _dustCanvas = document.createElement('canvas');
+_dustCanvas.width = _dustCanvas.height = 32;
+const _dustCtx = _dustCanvas.getContext('2d');
+const _dustGrad = _dustCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+_dustGrad.addColorStop(0.0, 'rgba(255,240,200,1.0)');
+_dustGrad.addColorStop(0.4, 'rgba(255,225,170,0.45)');
+_dustGrad.addColorStop(1.0, 'rgba(255,210,150,0.0)');
+_dustCtx.fillStyle = _dustGrad;
+_dustCtx.fillRect(0, 0, 32, 32);
+const dustTex = new THREE.CanvasTexture(_dustCanvas);
+dustTex.colorSpace = THREE.SRGBColorSpace;
+
+const dustMaterial = new THREE.PointsMaterial({
+  size:            0.06,
+  map:             dustTex,
+  transparent:     true,
+  depthWrite:      false,
+  blending:        THREE.AdditiveBlending,
+  opacity:         0,
+  sizeAttenuation: true,
+  color:           0xfff0c8,
+  toneMapped:      false,
+});
+const dust = new THREE.Points(dustGeo, dustMaterial);
+dust.frustumCulled = false;
+dust.position.set(0, 1, 1);
+scene.add(dust);
+window._dust = dust;
+
 // Day / night palettes — color targets for setDayNight transitions
 let isDayMode = false;
 let dayNightAnimId = null;
 
+// Ground plane mesh — captured at model load so its color can be tweened
+// between its original daytime tint and a near-midnight-blue at night.
+let groundPlaneMesh = null;
+let groundPlaneDayColor = null;
+const GROUND_NIGHT_COLOR = new THREE.Color(0x5f6163); // dim blue-gray — visible enough that the room's cast shadow reads against the backdrop
+
 const NIGHT_PALETTE = {
-  background:        new THREE.Color(0x0a1530),
+  background:        new THREE.Color(0x5f6163),
   beamColor:         new THREE.Color(0xd8e0f0),
   beamIntensity:     0.9,
   moonColor:         new THREE.Color(0xb0c0e0),
-  moonIntensity:     0.4,
+  moonIntensity:     0.3,
   ambientColor:      new THREE.Color(0x6a7a9a),
   ambientIntensity:  0.15,
   hemiSky:           new THREE.Color(0x2a3a5a),
@@ -749,21 +861,41 @@ const NIGHT_PALETTE = {
   hemiIntensity:     0.2,
   bulbIntensity:     5,
   deskLampIntensity: 1.0,
+  sunKeyColor:       new THREE.Color(0xffd49a),
+  sunKeyIntensity:   0,
+  moonKeyColor:      new THREE.Color(0x8aa6d0),
+  moonKeyIntensity:  2.4,
+  dustOpacity:       0,
+  groundColor:       GROUND_NIGHT_COLOR,
 };
 
 const DAY_PALETTE = {
-  background:        new THREE.Color(0x8aafc8),  // was 0x9bb2c1 — cooler blue sky
-  beamColor:         new THREE.Color(0xffe066),  // was 0xfff0c8 — richer yellow sunbeam
-  beamIntensity:     2.4,
-  moonColor:         new THREE.Color(0xe8f2ff),  // was 0xfff8e8 — cool blue-white sunlight
-  moonIntensity:     4.0,
-  ambientColor:      new THREE.Color(0xc8dcf8),  // was 0xe8ecf0 — noticeably bluer ambient
-  ambientIntensity:  0.3,
-  hemiSky:           new THREE.Color(0x90b8e8),  // was 0xb6d0e8 — deeper blue sky dome
-  hemiGround:        new THREE.Color(0xa08868),
-  hemiIntensity:     0.55,
+  // Warm-tinted sky, but still readable as outdoor blue
+  background:        new THREE.Color(0xa6c8e0),
+  // Saturated golden beam — bright streak that lives against a darker room
+  beamColor:         new THREE.Color(0xffb050),
+  beamIntensity:     2.6,
+  // moonFill becomes a quiet cool sky fill in day — just enough to keep shadows
+  // from going pitch black on the side opposite the sun. Stays out of the way.
+  moonColor:         new THREE.Color(0xb8d0e8),
+  moonIntensity:     0.6,
+  // Low warm ambient — keeps the room readable but does NOT lift shadows flat
+  ambientColor:      new THREE.Color(0xe8dccc),
+  ambientIntensity:  0.18,
+  // Hemisphere with a strong warm wood-bounce and modest intensity. The warm
+  // ground tint is what makes undersides of furniture feel cozy.
+  hemiSky:           new THREE.Color(0xa6c8e0),
+  hemiGround:        new THREE.Color(0xb88858),
+  hemiIntensity:     0.4,
   bulbIntensity:     0,
   deskLampIntensity: 0,
+  // Warm sun key — does ~all the directional work, casts shadows. This is the
+  // single biggest contributor to "cozy afternoon sun" instead of "showroom".
+  sunKeyColor:       new THREE.Color(0xffc278),
+  sunKeyIntensity:   2.6,
+  moonKeyColor:      new THREE.Color(0x8aa6d0),
+  moonKeyIntensity:  0,
+  dustOpacity:       0.7,
 };
 
 
@@ -842,7 +974,22 @@ function setDayNight(toDay) {
     }
   }
 
+  // Sun-key shadow map only matters in day mode. Bake once on the transition into
+  // day so the cast shadows are ready for the rest of the fade-in; clear it on
+  // night so we're not paying for a stale shadow pass.
+  if (toDay) {
+    sunKey.shadow.needsUpdate = true;
+  } else {
+    moonKey.shadow.needsUpdate = true;
+  }
+
   const to = toDay ? DAY_PALETTE : NIGHT_PALETTE;
+
+  // Ground color target depends on direction — to night, push toward midnight blue;
+  // to day, restore the original daytime tint captured at model load.
+  const groundTarget = toDay
+    ? (groundPlaneDayColor || GROUND_NIGHT_COLOR)
+    : GROUND_NIGHT_COLOR;
 
   const start = {
     background:        scene.background.clone(),
@@ -855,8 +1002,20 @@ function setDayNight(toDay) {
     hemiIntensity:     fillLight.intensity,
     bulbIntensity:     bulbLight.intensity,
     deskLampIntensity: deskLamp.intensity,
+    sunKeyColor:       sunKey.color.clone(),
+    sunKeyIntensity:   sunKey.intensity,
+    moonKeyColor:      moonKey.color.clone(),
+    moonKeyIntensity:  moonKey.intensity,
+    dustOpacity:       window._dust ? window._dust.material.opacity : 0,
     beamColor:         window._beam ? window._beam.material.uniforms.uColor.value.clone() : null,
     beamIntensity:     window._beam ? window._beam.material.uniforms.uIntensity.value : null,
+    groundColor:       (() => {
+                          if (!groundPlaneMesh || !groundPlaneMesh.material) return null;
+                          const m = Array.isArray(groundPlaneMesh.material)
+                            ? groundPlaneMesh.material[0]
+                            : groundPlaneMesh.material;
+                          return m && m.color ? m.color.clone() : null;
+                        })(),
   };
 
   if (dayNightAnimId) cancelAnimationFrame(dayNightAnimId);
@@ -882,11 +1041,29 @@ function setDayNight(toDay) {
     fillLight.intensity = THREE.MathUtils.lerp(start.hemiIntensity, to.hemiIntensity, eased);
     bulbLight.intensity = THREE.MathUtils.lerp(start.bulbIntensity, to.bulbIntensity, eased);
     deskLamp.intensity  = THREE.MathUtils.lerp(start.deskLampIntensity, to.deskLampIntensity, eased);
+    sunKey.color.copy(start.sunKeyColor).lerp(to.sunKeyColor, eased);
+    sunKey.intensity    = THREE.MathUtils.lerp(start.sunKeyIntensity, to.sunKeyIntensity, eased);
+    moonKey.color.copy(start.moonKeyColor).lerp(to.moonKeyColor, eased);
+    moonKey.intensity   = THREE.MathUtils.lerp(start.moonKeyIntensity, to.moonKeyIntensity, eased);
+    if (window._dust) {
+      window._dust.material.opacity = THREE.MathUtils.lerp(start.dustOpacity, to.dustOpacity, eased);
+    }
 
     if (window._beam && start.beamColor) {
       const u = window._beam.material.uniforms;
       u.uColor.value.copy(start.beamColor).lerp(to.beamColor, eased);
       u.uIntensity.value = THREE.MathUtils.lerp(start.beamIntensity, to.beamIntensity, eased);
+    }
+
+    // Tween the ground plane material color toward midnight blue at night /
+    // its captured day color when returning to day.
+    if (groundPlaneMesh && groundPlaneMesh.material && start.groundColor) {
+      const gm = Array.isArray(groundPlaneMesh.material)
+        ? groundPlaneMesh.material[0]
+        : groundPlaneMesh.material;
+      if (gm && gm.color) {
+        gm.color.copy(start.groundColor).lerp(groundTarget, eased);
+      }
     }
 
     if (t < 1) {
@@ -901,6 +1078,14 @@ function setDayNight(toDay) {
 // OrbitControls + camera state for default view and escape/focus animations
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
+
+// Clamp the orbit so users can't drag the camera under the ground plane
+// (which would reveal the empty sky/void beneath the diorama). PI/2 is the
+// horizon line through the controls target; nudging slightly past it lets
+// the camera dip closer to the floor without dropping below it. Tweak the
+// "+0.12" buffer up/down if you want more/less floor reveal.
+controls.maxPolarAngle = Math.PI / 2 + 0.12;
+controls.minPolarAngle = 0.15;
 
 const defaultCameraPosition = new THREE.Vector3();
 const defaultControlsTarget = new THREE.Vector3();
@@ -1377,12 +1562,44 @@ function startSceneLoad() {
     // Downsample any texture larger than 2048px — BMO's subtree stays at full resolution.
     downsampleTextures(model, 2048, bmoRoot ? [bmoRoot] : []);
 
-    // Pre-bake BOTH shadow maps right after the model loads so day/night transitions
-    // never trigger a mid-frame shadow recompute or shader recompile.
+    // Pre-bake ALL shadow maps right after the model loads so day/night transitions
+    // never trigger a mid-frame shadow recompute or shader recompile. moonKey and
+    // sunKey are flagged needsUpdate at construction, but that fires before the
+    // model is in the scene — re-flagging here ensures their first bake actually
+    // contains the room geometry (otherwise first-load night has no moon shadows
+    // and looks brighter than the post-toggle state).
     bulbLight.castShadow = true;
     bulbLight.shadow.needsUpdate = true;
     moonFill.castShadow = true;
     moonFill.shadow.needsUpdate = true;
+    sunKey.shadow.needsUpdate = true;
+    moonKey.shadow.needsUpdate = true;
+
+    // Ground plane — capture its original (day) color, then immediately tint
+    // it near midnight blue since the scene boots in night mode. The day
+    // color is preserved for setDayNight() to restore on the toggle to day.
+    groundPlaneMesh = model.getObjectByName('GroundPlane') || model.getObjectByName('Plane004');
+    if (groundPlaneMesh && groundPlaneMesh.material) {
+      // Clone the material so editing color doesn't bleed into anything
+      // else that might share this material reference.
+      if (Array.isArray(groundPlaneMesh.material)) {
+        groundPlaneMesh.material = groundPlaneMesh.material.map(m => m.clone());
+        // Use the first material's color as the tweenable target.
+        const first = groundPlaneMesh.material[0];
+        if (first && first.color) {
+          groundPlaneDayColor = first.color.clone();
+          if (!isDayMode) first.color.copy(GROUND_NIGHT_COLOR);
+        }
+      } else {
+        groundPlaneMesh.material = groundPlaneMesh.material.clone();
+        if (groundPlaneMesh.material.color) {
+          groundPlaneDayColor = groundPlaneMesh.material.color.clone();
+          if (!isDayMode) groundPlaneMesh.material.color.copy(GROUND_NIGHT_COLOR);
+        }
+      }
+    } else {
+      console.warn('No mesh named "GroundPlane" or "Plane004" found — night-mode ground tint disabled.');
+    }
 
     // Register clickable objects from the loaded model.
     // Each registerClickable() also builds an AABB proxy in interactionBoundingBoxes.
@@ -1616,11 +1833,22 @@ function startSceneLoad() {
       baseRotR: rightLeg ? rightLeg.rotation.clone() : null
     };
 
-    const box = new THREE.Box3().setFromObject(model);
+// Ground Plane 
+    const FRAMING_EXCLUDE = /ground/i;
+    const box = new THREE.Box3();
+    model.traverse((obj) => {
+      if (!obj.isMesh) return;
+      if (FRAMING_EXCLUDE.test(obj.name)) return;
+      const meshBox = new THREE.Box3().setFromObject(obj);
+      if (!meshBox.isEmpty()) box.union(meshBox);
+    });
+    // Fallback in case nothing matched (e.g. all meshes excluded)
+    if (box.isEmpty()) box.setFromObject(model);
+
     const size = box.getSize(new THREE.Vector3()).length();
     const center = box.getCenter(new THREE.Vector3());
 
-    camera.position.copy(center.clone().add(new THREE.Vector3(size, size, size)));
+    camera.position.copy(center.clone().add(new THREE.Vector3(size*1.1, size*0.6, size*1.1)));
     controls.target.copy(center);
     camera.lookAt(center);
     controls.update();
@@ -1732,6 +1960,26 @@ function animate() {
 
   if (paperMaterial) {
     paperMaterial.uniforms.uTime.value = performance.now() * 0.001;
+  }
+
+  // Dust motes — only step the sim when they're actually visible (day mode).
+  // Skipping this loop in night mode keeps the per-frame cost at ~0 there.
+  if (dustMaterial.opacity > 0.01) {
+    const arr = dustGeo.attributes.position.array;
+    const t = performance.now() * 0.001;
+    for (let i = 0; i < DUST_COUNT; i++) {
+      const ix = i * 3;
+      arr[ix    ] += dustVelocities[ix    ] * 0.016 + Math.sin(t + dustSeeds[i]) * 0.0008;
+      arr[ix + 1] += dustVelocities[ix + 1] * 0.016;
+      arr[ix + 2] += dustVelocities[ix + 2] * 0.016 + Math.cos(t + dustSeeds[i]) * 0.0008;
+      // wrap inside room volume so motes recirculate forever
+      if (arr[ix + 1] >  2.6) arr[ix + 1] = 0;
+      if (arr[ix    ] >  2.0) arr[ix    ] = -2.0;
+      if (arr[ix    ] < -2.0) arr[ix    ] =  2.0;
+      if (arr[ix + 2] >  2.0) arr[ix + 2] = -2.0;
+      if (arr[ix + 2] < -2.0) arr[ix + 2] =  2.0;
+    }
+    dustGeo.attributes.position.needsUpdate = true;
   }
 
   if (window._rig?.leftLeg && window._rig?.rightLeg) {
