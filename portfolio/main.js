@@ -877,9 +877,9 @@ window._dust = dust;
 
 // === Coffee steam ===
 
-const STEAM_COUNT = 60;
+const STEAM_COUNT = 67;
 const STEAM_RISE_HEIGHT = 0.4;          // total world units a particle rises before recycling
-const STEAM_WAVE_AMP    = 0.022;        // half-width of the wave (gentle)
+const STEAM_WAVE_AMP    = 0.037;        // half-width of the wave (gentle)
 const STEAM_WAVE_FREQ   = Math.PI * 3;  // ~1.5 full wave cycles over the rise height
 const steamGeo = new THREE.BufferGeometry();
 const steamPositions = new Float32Array(STEAM_COUNT * 3);
