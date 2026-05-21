@@ -33,13 +33,36 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('/draco/');
 RectAreaLightUniformsLib.init();
 
-// audio fx
-const clickSound = new Audio('/on.wav');
-const ukeSound = new Audio('/uke.wav');
-const ambientSound = new Audio('/ambience.mp3');
-// const clickSound2 = new Audio('/whoosh.wav')
-const zoomIn = new Audio('/whoosh.wav')
-const zoomOut = new Audio('/zoomout.wav')
+// audio fx — Audio elements are created with preload='none' so the browser
+// does NOT immediately fetch them at script-init time. Previously these 5
+// files (~5.8MB combined, mostly the 4.1MB ambience.mp3) raced the title-screen
+// background image and the GLB for bandwidth on page load. They're now lazily
+// fetched on first use (or explicitly warmed AFTER the GLB load finishes).
+function makeLazyAudio(src, volume) {
+  const a = new Audio();
+  a.preload = 'none';
+  a.src = src;
+  if (volume != null) a.volume = volume;
+  return a;
+}
+const clickSound  = makeLazyAudio('/on.wav', 0.3);
+const ukeSound    = makeLazyAudio('/uke.wav', 0.5);
+const ambientSound = makeLazyAudio('/ambience.mp3', 0.3);
+const zoomIn      = makeLazyAudio('/whoosh.wav');
+const zoomOut     = makeLazyAudio('/zoomout.wav');
+
+// warmAudio — call after the GLB has finished loading to start fetching the
+// remaining sound effects in the background (so the first click feels snappy)
+// without blocking the critical path.
+function warmAudio() {
+  // Use setTimeout so this hops out of the GLB-load callback and doesn't
+  // stall any DOM work happening in dismissLoadingScreen().
+  setTimeout(() => {
+    [clickSound, ukeSound, zoomIn, zoomOut].forEach((a) => {
+      try { a.preload = 'auto'; a.load(); } catch (_) {}
+    });
+  }, 0);
+}
 // Scene + shared state
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x5f6163);
@@ -207,8 +230,9 @@ const titleScreen = document.createElement('div');
 titleScreen.id = 'titleScreen';
 titleScreen.innerHTML = `
   <div class="title-content">
-    <div class="title-text">kyle's portfolio</div>
-    <div class="title-hint">click anywhere to begin</div>
+    <div class="title-text">kyle fernandez</div>
+    <div class="title-subtitle">software engineer</div>
+    <div class="title-hint">[ click anywhere to begin  ]</div>
   </div>
 `;
 titleScreen.style.cssText = `
@@ -234,7 +258,7 @@ titleStyle.innerHTML = `
     content: '';
     position: absolute;
     inset: -60px;          /* overshoot edges so blur fringe is hidden */
-    background: url('/background.png') center / cover no-repeat;
+    background: url('/background-blur.jpg') center / cover no-repeat;
     filter: blur(50px) brightness(0.5);
     z-index: 0;
   }
@@ -258,8 +282,17 @@ titleStyle.innerHTML = `
     font-size: clamp(28px, 6vw, 44px);
     letter-spacing: 6px;
     text-align: center;
-    margin-bottom: 28px;
+    margin-bottom: 0px;
     text-shadow: 0 0 20px rgba(91,203,154,0.25);
+  }
+  #titleScreen .title-subtitle{
+    font-size: clamp(11px, 1.6vw, 14px);
+    letter-spacing: 5px;
+    text-align: center;
+    margin-bottom: 48px;
+    opacity: 0.7;
+    color: #c9f4df;
+    text-transform: lowercase;
   }
   #titleScreen .title-hint{
     text-align: center;
@@ -306,7 +339,7 @@ const pickerBgImage = document.createElement('div');
 pickerBgImage.style.cssText = `
   position: absolute;
   inset: -60px;
-  background: url('/background.png') center / cover no-repeat;
+  background: url('/background-blur.jpg') center / cover no-repeat;
   filter: blur(60px) brightness(0.3);
   z-index: 0;
 `;
@@ -434,8 +467,11 @@ pick3dBtn.addEventListener('click', () => {
   closePicker();
   // Start ambient music — loop forever, kick off inside the click handler so
   // the browser's autoplay policy is satisfied (user gesture required).
+  // preload was 'none' to keep it off the critical path; flip it on now so the
+  // 4.1MB ambience.mp3 starts streaming in parallel with the GLB rather than
+  // before it.
   ambientSound.loop = true;
-  ambientSound.volume = 0.5;
+  ambientSound.preload = 'auto';
   ambientSound.play().catch(err => console.warn('ambient audio blocked:', err));
   // Mount + show the loading overlay, start cycling tips, and fire the GLB fetch.
   document.body.appendChild(loadingScreen);
@@ -792,10 +828,8 @@ window.toggleLampHelper = () => {
 };
 toggleLampHelper();
 
-// Dust motes — small floating particles that catch the sunbeam in day mode.
-// Builds a CanvasTexture once (cheap, ~32×32 radial gradient) for a soft round
-// sprite, then drives ~120 points with sinusoidal drift inside the room bounds.
-// material.opacity is tweened in setDayNight so dust fades in with daylight.
+// Dust motes in day mode.
+
 const DUST_COUNT = 130;
 const dustGeo = new THREE.BufferGeometry();
 const dustPositions  = new Float32Array(DUST_COUNT * 3);
@@ -840,6 +874,86 @@ dust.frustumCulled = false;
 dust.position.set(0, 1, 1);
 scene.add(dust);
 window._dust = dust;
+
+// === Coffee steam ===
+
+const STEAM_COUNT = 60;
+const STEAM_RISE_HEIGHT = 0.4;          // total world units a particle rises before recycling
+const STEAM_WAVE_AMP    = 0.022;        // half-width of the wave (gentle)
+const STEAM_WAVE_FREQ   = Math.PI * 3;  // ~1.5 full wave cycles over the rise height
+const steamGeo = new THREE.BufferGeometry();
+const steamPositions = new Float32Array(STEAM_COUNT * 3);
+const steamLife      = new Float32Array(STEAM_COUNT);
+const steamSeeds     = new Float32Array(STEAM_COUNT);
+for (let i = 0; i < STEAM_COUNT; i++) {
+  steamLife[i]  = i / STEAM_COUNT;           
+  steamSeeds[i] = (Math.random() - 0.5) * 0.6;
+}
+steamGeo.setAttribute('position', new THREE.BufferAttribute(steamPositions, 3));
+steamGeo.setAttribute('aLife',    new THREE.BufferAttribute(steamLife, 1));
+
+// Soft circular puff texture, generated on a canvas so we don't ship a PNG.
+const _steamCanvas = document.createElement('canvas');
+_steamCanvas.width  = 64;
+_steamCanvas.height = 64;
+const _steamCtx  = _steamCanvas.getContext('2d');
+const _steamGrad = _steamCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+_steamGrad.addColorStop(0.00, 'rgba(255,255,255,1.0)');
+_steamGrad.addColorStop(0.35, 'rgba(255,255,255,0.55)');
+_steamGrad.addColorStop(1.00, 'rgba(255,255,255,0.0)');
+_steamCtx.fillStyle = _steamGrad;
+_steamCtx.fillRect(0, 0, 64, 64);
+const steamTex = new THREE.CanvasTexture(_steamCanvas);
+steamTex.colorSpace = THREE.SRGBColorSpace;
+
+// Custom shader so each particle can have its own alpha and size based on life.
+// NormalBlending (not Additive) — steam is light-colored, not light-emitting.
+const steamMaterial = new THREE.ShaderMaterial({
+  uniforms: {
+    uMap:        { value: steamTex },
+    uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.0) },
+    uBaseSize:   { value: 55.0 }, // smaller individual particles — overlap creates the ribbon
+  },
+  vertexShader: /* glsl */ `
+    attribute float aLife;
+    varying float vLife;
+    uniform float uPixelRatio;
+    uniform float uBaseSize;
+    void main() {
+      vLife = aLife;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      // Ribbon-style: only mild growth as the steam rises (not a puff expansion).
+      float sizeMul = 0.55 + aLife * 0.75;
+      gl_PointSize = uBaseSize * sizeMul * uPixelRatio / -mv.z;
+      gl_Position  = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D uMap;
+    varying float vLife;
+    void main() {
+      vec4 tex = texture2D(uMap, gl_PointCoord);
+      // Quick fade-in at the spout, slow fade-out as the puff drifts up.
+      float fadeIn  = smoothstep(0.0, 0.18, vLife);
+      float fadeOut = 1.0 - smoothstep(0.55, 1.0, vLife);
+      float a = tex.a * fadeIn * fadeOut * 0.09;
+      gl_FragColor = vec4(vec3(0.95, 0.96, 0.95), a);
+    }
+  `,
+  transparent:  true,
+  depthWrite:   false,
+  blending:     THREE.NormalBlending,
+  toneMapped:   false,
+});
+
+const coffeeSteam = new THREE.Points(steamGeo, steamMaterial);
+coffeeSteam.frustumCulled = false;
+coffeeSteam.renderOrder   = 10;     // draw after opaque geometry
+coffeeSteam.visible       = false;  // turned on once we've located CoffeeSmoke
+scene.add(coffeeSteam);
+
+const steamOrigin = new THREE.Vector3();
+let   steamReady  = false;
 
 // Day / night palettes — color targets for setDayNight transitions
 let isDayMode = false;
@@ -1690,6 +1804,27 @@ function startSceneLoad() {
    
 
 
+    // Coffee steam emitter — find the CoffeeSmoke mesh, hide it, and use its
+    // world position as the spawn point for the steam particle system.
+    const coffeeSmoke = model.getObjectByName('CoffeeSmoke');
+    if (coffeeSmoke) {
+      coffeeSmoke.visible = false; // mesh is just a marker; real effect is the Points cloud
+      coffeeSmoke.getWorldPosition(steamOrigin);
+      // Seed all particles at the origin so the first few frames don't show
+      // any stale (0,0,0) positions before the loop respawns them naturally.
+      for (let i = 0; i < STEAM_COUNT; i++) {
+        const ix = i * 3;
+        steamPositions[ix    ] = steamOrigin.x;
+        steamPositions[ix + 1] = steamOrigin.y;
+        steamPositions[ix + 2] = steamOrigin.z;
+      }
+      steamGeo.attributes.position.needsUpdate = true;
+      coffeeSteam.visible = true;
+      steamReady = true;
+    } else {
+      console.warn('No mesh named "CoffeeSmoke" found — steam disabled.');
+    }
+
     // Anchor desk lamp light to Cylinder005 mesh position
     const deskLampMesh = model.getObjectByName('Cylinder005');
     if (deskLampMesh) {
@@ -1871,7 +2006,7 @@ function startSceneLoad() {
     const size = box.getSize(new THREE.Vector3()).length();
     const center = box.getCenter(new THREE.Vector3());
 
-    camera.position.copy(center.clone().add(new THREE.Vector3(size*1.1, size*0.6, size*1.1)));
+    camera.position.copy(center.clone().add(new THREE.Vector3(size*1.1, size*0.4, size*1.1)));
     controls.target.copy(center);
     camera.lookAt(center);
     controls.update();
@@ -1881,19 +2016,25 @@ function startSceneLoad() {
 
     dismissLoadingScreen();
     dracoLoader.dispose();
+    // Now that the GLB is in, warm up the remaining SFX in the background so
+    // the user's first click/zoom isn't waiting on a cold fetch.
+    warmAudio();
   },
   (xhr) => {
     const bar = document.getElementById('loadingBarFill');
     const pct = document.getElementById('loadingPercent');
-    if (xhr && xhr.lengthComputable && xhr.total > 0) {
-      const ratio = Math.min(1, xhr.loaded / xhr.total);
-      const percent = Math.round(ratio * 100);
-      if (bar) bar.style.width = percent + '%';
-      if (pct) pct.textContent = percent + '%';
-    } else {
-      loadingScreen.classList.add('indeterminate');
-      if (pct) pct.textContent = '...';
-    }
+    // Production CDNs (Vercel + br/gzip) usually strip Content-Length on
+    // chunked responses, so xhr.lengthComputable is false. In that case we
+    // estimate against the known Draco-compressed GLB size so the bar still
+    // moves accurately for the user instead of going indeterminate.
+    const ESTIMATED_GLB_BYTES = 68_309_076; // size of backupisometricScene.glb
+    const total = (xhr && xhr.lengthComputable && xhr.total > 0)
+      ? xhr.total
+      : ESTIMATED_GLB_BYTES;
+    const ratio = Math.min(1, (xhr?.loaded || 0) / total);
+    const percent = Math.round(ratio * 100);
+    if (bar) bar.style.width = percent + '%';
+    if (pct) pct.textContent = percent + '%';
   },
   (error) => {
     console.error('GLTF load error:', error);
@@ -2003,6 +2144,39 @@ function animate() {
       if (arr[ix + 2] < -2.0) arr[ix + 2] =  2.0;
     }
     dustGeo.attributes.position.needsUpdate = true;
+  }
+
+  // Coffee steam — wave-like ribbon, not discrete puffs.
+  // Each particle's position is computed directly from its `life` (0..1) so it
+  // traces a vertical sine path from the spout. Because every particle follows
+  // the SAME wave shape (with only a tiny per-particle phase jitter via
+  // steamSeeds), they merge into a continuous wavy ribbon instead of reading
+  // as individual dots. A slow global time term makes the whole ribbon drift
+  // sideways gently, like real rising steam catching air currents.
+  if (steamReady) {
+    const pos     = steamGeo.attributes.position.array;
+    const lifeArr = steamGeo.attributes.aLife.array;
+    const dt = 0.016;
+    const t  = performance.now() * 0.001;
+    const globalDriftX = Math.sin(t * 0.5) * 0.6;  // shared phase, slow drift
+    const globalDriftZ = Math.cos(t * 0.4) * 0.6;
+    for (let i = 0; i < STEAM_COUNT; i++) {
+      const ix = i * 3;
+      lifeArr[i] += dt * 0.22;          // ~4.5s for a particle to complete its rise
+      if (lifeArr[i] >= 1.0) lifeArr[i] -= 1.0;  // wrap (no respawn at origin — continuous ribbon)
+
+      const life  = lifeArr[i];
+      const seed  = steamSeeds[i];
+      // Wave amplitude widens slightly with height — base width near the spout,
+      // wider sway near the top, the way real steam disperses as it cools.
+      const widen = 0.4 + life * 1.1;
+      const phase = life * STEAM_WAVE_FREQ + seed + globalDriftX;
+      pos[ix    ] = steamOrigin.x + Math.sin(phase) * STEAM_WAVE_AMP * widen;
+      pos[ix + 1] = steamOrigin.y + life * STEAM_RISE_HEIGHT;
+      pos[ix + 2] = steamOrigin.z + Math.cos(phase * 0.9 + globalDriftZ) * STEAM_WAVE_AMP * 0.6 * widen;
+    }
+    steamGeo.attributes.position.needsUpdate = true;
+    steamGeo.attributes.aLife.needsUpdate    = true;
   }
 
   if (window._rig?.leftLeg && window._rig?.rightLeg) {
@@ -2419,3 +2593,13 @@ function zoomToScreenThenShowStatic() {
 
   onFocusComplete = () => { showStaticScreen(); };
 }
+
+
+/*
+TO DO
+need to fix performance fps wise
+different containers different devices
+need to fix possible bugs
+need to fix all load time issues
+need to fix any camera bugs
+*/

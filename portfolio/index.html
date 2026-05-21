@@ -1,11 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <link rel="icon" type="image/png" href="/bmoicon2.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">
+    <link rel="icon" type="image/png" sizes="128x128" href="/favicon-128.png">
     <meta charset="utf-8">
     <title>kyle's portfolio</title>
+    <!-- Preload the tiny blurred backdrop so the title paints with its bg
+         already there instead of flashing in. ~5KB. -->
+    <link rel="preload" as="image" href="/background-blur.jpg">
+    <!-- Preconnect for fonts so the @font-face fetch starts in parallel. -->
+    <link rel="preload" as="font" href="/fonts/Minecraftia-Regular.ttf" type="font/ttf" crossorigin>
     <style>
-      body { margin: 0; }
+      body { margin: 0; background: #0a1530; }
     </style>
   </head>
   <body>
