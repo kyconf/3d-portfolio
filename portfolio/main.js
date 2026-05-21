@@ -1928,7 +1928,7 @@ fpsDisplay.style.cssText = `
   border: 1px solid rgba(201,244,223,0.25);
 `;
 fpsDisplay.textContent = 'FPS: --';
-document.body.appendChild(fpsDisplay);
+// document.body.appendChild(fpsDisplay);
 
 let fpsFrameCount = 0;
 let fpsLastTime = performance.now();
