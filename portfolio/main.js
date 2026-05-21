@@ -110,6 +110,11 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
 document.body.appendChild(renderer.domElement);
 
+// Disable text/cursor selection on all elements globally
+const noSelectStyle = document.createElement('style');
+noSelectStyle.innerHTML = `* { user-select: none; -webkit-user-select: none; }`;
+document.head.appendChild(noSelectStyle);
+
 // appReady — flips true only once the GLB has finished loading and the scene
 // is interactive. The pointerdown handler short-circuits on !appReady, so
 // stray clicks on the title / picker / loading overlays never hit the
