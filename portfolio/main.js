@@ -10,17 +10,7 @@ import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUnifo
 import { RectAreaLightHelper } from 'three/addons/helpers/RectAreaLightHelper.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
-// bfcache guard — when the user navigates from here to the 2D site and then
-// hits browser back, the page is restored from bfcache with a half-dead WebGL
-// context (only the bulb paints, the rest of the room is gone). We only want
-// the reload-to-root behavior for that specific flow, NOT for the BMO desktop
-// round-trip (clicking BMO's screen → /bmo_desktop → back), which would
-// otherwise also trip pageshow.persisted and force an unwanted refresh.
-//
-// To scope this, the 2D-site navigation sets a sessionStorage flag below.
-// Here, we only act on a bfcache restore (event.persisted === true) AND only
-// when that flag is set, then clear it. Initial loads (persisted=false) and
-// all other bfcache restores are left alone.
+// reload on bfcache restore from the 2D site — avoids broken WebGL context
 window.addEventListener('pageshow', (event) => {
   if (event.persisted && sessionStorage.getItem('reload3DOnReturn') === '1') {
     sessionStorage.removeItem('reload3DOnReturn');
@@ -28,16 +18,10 @@ window.addEventListener('pageshow', (event) => {
   }
 });
 
-// Draco loader — points to decoder files served from /public/draco/
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('/draco/');
 RectAreaLightUniformsLib.init();
 
-// audio fx — Audio elements are created with preload='none' so the browser
-// does NOT immediately fetch them at script-init time. Previously these 5
-// files (~5.8MB combined, mostly the 4.1MB ambience.mp3) raced the title-screen
-// background image and the GLB for bandwidth on page load. They're now lazily
-// fetched on first use (or explicitly warmed AFTER the GLB load finishes).
 function makeLazyAudio(src, volume) {
   const a = new Audio();
   a.preload = 'none';
@@ -51,12 +35,7 @@ const ambientSound = makeLazyAudio('/ambience.mp3', 0.3);
 const zoomIn      = makeLazyAudio('/whoosh.wav');
 const zoomOut     = makeLazyAudio('/zoomout.wav');
 
-// warmAudio — call after the GLB has finished loading to start fetching the
-// remaining sound effects in the background (so the first click feels snappy)
-// without blocking the critical path.
 function warmAudio() {
-  // Use setTimeout so this hops out of the GLB-load callback and doesn't
-  // stall any DOM work happening in dismissLoadingScreen().
   setTimeout(() => {
     [clickSound, ukeSound, zoomIn, zoomOut].forEach((a) => {
       try { a.preload = 'auto'; a.load(); } catch (_) {}
@@ -115,15 +94,8 @@ const noSelectStyle = document.createElement('style');
 noSelectStyle.innerHTML = `* { user-select: none; -webkit-user-select: none; }`;
 document.head.appendChild(noSelectStyle);
 
-// appReady — flips true only once the GLB has finished loading and the scene
-// is interactive. The pointerdown handler short-circuits on !appReady, so
-// stray clicks on the title / picker / loading overlays never hit the
-// (still empty) scene graph.
 let appReady = false;
 
-// Loading screen — shown only after the user picks 3D, drives a progress bar.
-// Created up front so loadingScreen.querySelector(...) works, but NOT appended
-// to the body yet — that happens inside startSceneLoad() when the user picks 3D.
 const loadingScreen = document.createElement('div');
 loadingScreen.id = 'loadingScreen';
 loadingScreen.innerHTML = `
@@ -202,8 +174,6 @@ loadingStyle.innerHTML = `
 `;
 document.head.appendChild(loadingStyle);
 
-// loadingTipInterval — cycles tip text in the loading bar so it doesn't feel frozen.
-// Not started at module load — kicked off inside startSceneLoad() once 3D is picked.
 const loadingTipEl = loadingScreen.querySelector('#loadingTip');
 const loadingTips = [
   'preparing the scene...',
@@ -223,14 +193,8 @@ function startLoadingTipCycle() {
   }, 1800);
 }
 
-// isMobile — narrow viewport OR a primary input device that doesn't have a
-// real mouse. The 3D experience needs OrbitControls + a hover cursor, neither
-// of which work great on touch, so we gate it behind this flag.
 const isMobile = window.matchMedia('(max-width: 900px), (pointer: coarse)').matches;
 
-// Title screen — first thing the user sees. Click anywhere to dismiss and
-// reveal the experience picker. The heavy 3D scene + GLB fetch don't even
-// start until the user explicitly opts into 3D from the picker.
 const titleScreen = document.createElement('div');
 titleScreen.id = 'titleScreen';
 titleScreen.innerHTML = `
@@ -339,7 +303,6 @@ pickerOverlay.style.cssText = `
   font-family: 'Minecraftia', 'Courier New', monospace;
   color: #c9f4df;
 `;
-// Inject real bg divs so the blurred image reliably covers whatever is behind the picker
 const pickerBgImage = document.createElement('div');
 pickerBgImage.style.cssText = `
   position: absolute;
@@ -359,7 +322,6 @@ pickerBgTint.style.cssText = `
 `;
 pickerOverlay.appendChild(pickerBgTint);
 
-// Picker content — z-index 2 so it floats above the background layers
 const pickerContent = document.createElement('div');
 pickerContent.style.cssText = `
   position: relative;
@@ -419,8 +381,6 @@ document.body.appendChild(pickerOverlay);
 const pick3dBtn = pickerOverlay.querySelector('#pick3d');
 const pick2dBtn = pickerOverlay.querySelector('#pick2d');
 
-// On mobile, the 3D button is visually disabled and shows a "desktop only"
-// label. Its click handler is a no-op so the heavy GLB never starts loading.
 if (isMobile) {
   pick3dBtn.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
@@ -431,9 +391,8 @@ if (isMobile) {
   pick3dBtn.disabled = true;
 }
 
-// Hover affordance — only on the 2D button on mobile (3D is disabled).
 ['pick3d', 'pick2d'].forEach(id => {
-  if (id === 'pick3d' && isMobile) return; // no hover lift on a disabled button
+  if (id === 'pick3d' && isMobile) return;
   const btn = pickerOverlay.querySelector(`#${id}`);
   btn.addEventListener('mouseenter', () => {
     btn.style.background = 'rgba(61,168,122,0.2)';
@@ -447,20 +406,17 @@ if (isMobile) {
   });
 });
 
-// closePicker — fades out and removes the experience picker overlay
 function closePicker() {
   pickerOverlay.style.opacity = '0';
   pickerOverlay.style.pointerEvents = 'none';
   setTimeout(() => pickerOverlay.remove(), 450);
 }
 
-// showPicker — fades in the experience picker (called from the title screen click).
 function showPicker() {
   pickerOverlay.style.pointerEvents = 'auto';
   pickerOverlay.style.opacity = '1';
 }
 
-// Title screen click → fade title out, fade picker in.
 titleScreen.addEventListener('click', () => {
   titleScreen.classList.add('fade-out');
   showPicker();
@@ -468,26 +424,17 @@ titleScreen.addEventListener('click', () => {
 }, { once: true });
 
 pick3dBtn.addEventListener('click', () => {
-  if (isMobile) return;                   // hard guard, also covered by `disabled`
+  if (isMobile) return;
   closePicker();
-  // Start ambient music — loop forever, kick off inside the click handler so
-  // the browser's autoplay policy is satisfied (user gesture required).
-  // preload was 'none' to keep it off the critical path; flip it on now so the
-  // 4.1MB ambience.mp3 starts streaming in parallel with the GLB rather than
-  // before it.
   ambientSound.loop = true;
   ambientSound.preload = 'auto';
   ambientSound.play().catch(err => console.warn('ambient audio blocked:', err));
-  // Mount + show the loading overlay, start cycling tips, and fire the GLB fetch.
   document.body.appendChild(loadingScreen);
   startLoadingTipCycle();
   startSceneLoad();
 });
 
 pick2dBtn.addEventListener('click', () => {
-  // Mark this navigation as a 2D-site jump so the pageshow handler at the top
-  // of the file knows to hard-reload when the user comes back via bfcache.
-  // Without this, bfcache restores the 3D page with a broken WebGL context.
   sessionStorage.setItem('reload3DOnReturn', '1');
   pickerOverlay.style.opacity = '0';
   setTimeout(() => {
@@ -495,8 +442,6 @@ pick2dBtn.addEventListener('click', () => {
   }, 350);
 });
 
-// dismissLoadingScreen — fills bar to 100%, fades out loading screen,
-// and flips appReady so the scene's pointerdown handler comes online.
 function dismissLoadingScreen() {
   if (loadingTipInterval) {
     clearInterval(loadingTipInterval);
@@ -515,7 +460,6 @@ function dismissLoadingScreen() {
   }, 250);
 }
 
-// navCover — mint-colored flash cover used during BMO page transition
 const navCover = document.createElement('div');
 navCover.style.cssText = `
   position: fixed;
@@ -528,7 +472,6 @@ navCover.style.cssText = `
 `;
 document.body.appendChild(navCover);
 
-// fontStyle — loads the Minecraftia pixel font from /public/fonts/
 const fontStyle = document.createElement('style');
 fontStyle.innerHTML = `
   @font-face {
@@ -540,7 +483,6 @@ fontStyle.innerHTML = `
 `;
 document.head.appendChild(fontStyle);
 
-// Help overlay — "?" button in the bottom-right corner with instructions panel
 const helpBtn = document.createElement('button');
 helpBtn.textContent = '?';
 helpBtn.style.cssText = `
@@ -625,7 +567,6 @@ document.body.appendChild(helpOverlay);
 
 let helpOpen = false;
 
-// openHelp / closeHelp — shows or hides the instructions overlay
 function openHelp() {
   helpOpen = true;
   helpOverlay.style.opacity = '1';
@@ -646,7 +587,6 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && helpOpen) closeHelp();
 });
 
-// tipBar — Minecraft-style toast shown when the user clicks the bed
 const tipBar = document.createElement('div');
 tipBar.innerText = 'You may not rest now, there are monsters nearby';
 tipBar.style.position = 'absolute';
@@ -665,7 +605,6 @@ tipBar.style.transition = 'opacity 0.5s ease-in-out';
 tipBar.style.opacity = '0';
 document.body.appendChild(tipBar);
 
-// Renderer settings — tone mapping, shadows, color space
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.7;
 renderer.shadowMap.enabled = true;
@@ -676,7 +615,7 @@ const box = new THREE.Box3().setFromObject(scene);
 const center = box.getCenter(new THREE.Vector3());
 console.log('center:', center);
 
-// Lights — hemisphere fill, ambient, directional moon, ceiling bulb, desk lamp
+// lights
 const fillLight = new THREE.HemisphereLight(0x2a3a5a, 0x0a0a15, 0.2);
 scene.add(fillLight);
 
@@ -684,28 +623,17 @@ const ambientLight = new THREE.AmbientLight(0x6a7a9a, 0.15);
 scene.add(ambientLight);
 
 const moonFill = new THREE.DirectionalLight(0xb0c0e0, 0.4);
-// - 5 3, 2
 moonFill.position.set(-10, 3, 4);
 moonFill.target.position.set(center.x, center.y, center.z);
 moonFill.target.updateMatrixWorld();
 scene.add(moonFill, moonFill.target);
 moonFill.castShadow = false;
 
-// sunKey — warm directional light that mimics late-afternoon sun streaming in
-// through the window. Lives next to moonFill (same target) but rides a separate
-// intensity track so it can be off at night and ramp up at day without polluting
-// the cool moon palette. Tinted golden so daytime feels warm and inviting.
-//
-// Casts shadows in day mode — this is what gives the room its "afternoon" feel
-// (cast shadows of furniture/window on the floor and walls). autoUpdate is off
-// so the shadow map is computed once per day-toggle, not every frame.
 const sunKey = new THREE.DirectionalLight(0xffd49a, 0);
 sunKey.position.set(-4.5, 3.5, 1.5);
 sunKey.target.position.set(center.x, center.y, center.z);
 sunKey.target.updateMatrixWorld();
 sunKey.castShadow = true;
-// 1024² is plenty for a stylized diorama at this camera range — saves ~6MB VRAM
-// and trims the first-load shadow bake from ~50ms to ~12ms vs 2048².
 sunKey.shadow.mapSize.set(1024, 1024);
 sunKey.shadow.bias        = -0.003;
 sunKey.shadow.normalBias  = 0.08;
@@ -722,18 +650,11 @@ sunKey.shadow.needsUpdate = true;
 scene.add(sunKey, sunKey.target);
 window._sunKey = sunKey;
 
-// moonKey — directional counterpart to sunKey for night mode. Cool blue tint,
-// same window-side angle, casts shadows through the window frame to give the
-// floor that classic "moonlight through blinds" pattern. Shadow map is pre-baked
-// at load time and only refreshed on day/night toggle (same pattern as sunKey)
-// so it doesn't tank framerate. Intensity rides the day/night palette — 0 in
-// day, lifted at night.
 const moonKey = new THREE.DirectionalLight(0x8aa6d0, 2.4);
 moonKey.position.set(-4.5, 3.5, 1.5);
 moonKey.target.position.set(center.x, center.y, center.z);
 moonKey.target.updateMatrixWorld();
 moonKey.castShadow = true;
-// Match sunKey — 1024² is the sweet spot for this scene.
 moonKey.shadow.mapSize.set(1024, 1024);
 moonKey.shadow.bias        = -0.003;
 moonKey.shadow.normalBias  = 0.08;
@@ -762,11 +683,6 @@ moonFill.shadow.camera.bottom = -8;
 moonFill.shadow.camera.updateProjectionMatrix();
 moonFill.shadow.autoUpdate = false;
 
-// bulbLight — warm ceiling point light that casts shadows in night mode.
-// PointLight shadows are 6 cubemap face renders, so every wasted unit of frustum
-// costs 6× as much as a directional light. The bulb sits at y=2 in a small
-// isometric room (~5×5×3); tightening near/far cuts depth-precision waste and
-// gives us crisper, cheaper shadow samples.
 const bulbLight = new THREE.PointLight(0xffd9a0, 5, 8, 1);
 bulbLight.position.set(0.5, 4.5, 0.5);
 bulbLight.castShadow = true;
@@ -775,8 +691,8 @@ bulbLight.shadow.mapSize.height = 1024;
 bulbLight.shadow.bias           = -0.0005;
 bulbLight.shadow.normalBias     = 0.02;
 bulbLight.shadow.radius         = 4;
-bulbLight.shadow.camera.near = 0.5;   // skip the bulb mesh itself + reclaim z-precision
-bulbLight.shadow.camera.far  = 5;     // room floor is ~2 units below, walls ~2.5 away
+bulbLight.shadow.camera.near = 0.5;
+bulbLight.shadow.camera.far  = 5;
 bulbLight.shadow.camera.updateProjectionMatrix();
 bulbLight.shadow.autoUpdate = false;
 bulbLight.shadow.needsUpdate = true;
@@ -793,7 +709,6 @@ bulbMesh.receiveShadow = false;
 scene.add(bulbMesh);
 window._bulb = bulbLight;
 
-// deskLamp — warm point light anchored to the desk lamp mesh after GLB loads
 const deskLamp = new THREE.PointLight(0xffd1a0, 0, 3.0, 1.8);
 deskLamp.castShadow = false;
 scene.add(deskLamp);
@@ -810,7 +725,6 @@ deskLampBulbMesh.receiveShadow = false;
 scene.add(deskLampBulbMesh);
 window._deskLampBulb = deskLampBulbMesh;
 
-// Desk lamp console helpers — nudgeLamp, setLampPos, showLampPos, toggleLampHelper
 window.nudgeLamp = (dx = 0, dy = 0, dz = 0) => {
   deskLamp.position.x += dx;
   deskLamp.position.y += dy;
@@ -832,8 +746,6 @@ window.toggleLampHelper = () => {
   console.log(`Lamp helper visible: ${deskLampBulbMesh.visible}`);
 };
 toggleLampHelper();
-
-// Dust motes in day mode.
 
 const DUST_COUNT = 130;
 const dustGeo = new THREE.BufferGeometry();
@@ -880,12 +792,10 @@ dust.position.set(0, 1, 1);
 scene.add(dust);
 window._dust = dust;
 
-// === Coffee steam ===
-
 const STEAM_COUNT = 67;
-const STEAM_RISE_HEIGHT = 0.4;          // total world units a particle rises before recycling
-const STEAM_WAVE_AMP    = 0.037;        // half-width of the wave (gentle)
-const STEAM_WAVE_FREQ   = Math.PI * 3;  // ~1.5 full wave cycles over the rise height
+const STEAM_RISE_HEIGHT = 0.4;
+const STEAM_WAVE_AMP    = 0.037;
+const STEAM_WAVE_FREQ   = Math.PI * 3;
 const steamGeo = new THREE.BufferGeometry();
 const steamPositions = new Float32Array(STEAM_COUNT * 3);
 const steamLife      = new Float32Array(STEAM_COUNT);
@@ -897,7 +807,6 @@ for (let i = 0; i < STEAM_COUNT; i++) {
 steamGeo.setAttribute('position', new THREE.BufferAttribute(steamPositions, 3));
 steamGeo.setAttribute('aLife',    new THREE.BufferAttribute(steamLife, 1));
 
-// Soft circular puff texture, generated on a canvas so we don't ship a PNG.
 const _steamCanvas = document.createElement('canvas');
 _steamCanvas.width  = 64;
 _steamCanvas.height = 64;
@@ -911,13 +820,11 @@ _steamCtx.fillRect(0, 0, 64, 64);
 const steamTex = new THREE.CanvasTexture(_steamCanvas);
 steamTex.colorSpace = THREE.SRGBColorSpace;
 
-// Custom shader so each particle can have its own alpha and size based on life.
-// NormalBlending (not Additive) — steam is light-colored, not light-emitting.
 const steamMaterial = new THREE.ShaderMaterial({
   uniforms: {
     uMap:        { value: steamTex },
     uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.0) },
-    uBaseSize:   { value: 55.0 }, // smaller individual particles — overlap creates the ribbon
+    uBaseSize:   { value: 55.0 },
   },
   vertexShader: /* glsl */ `
     attribute float aLife;
@@ -927,7 +834,6 @@ const steamMaterial = new THREE.ShaderMaterial({
     void main() {
       vLife = aLife;
       vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      // Ribbon-style: only mild growth as the steam rises (not a puff expansion).
       float sizeMul = 0.55 + aLife * 0.75;
       gl_PointSize = uBaseSize * sizeMul * uPixelRatio / -mv.z;
       gl_Position  = projectionMatrix * mv;
@@ -938,7 +844,6 @@ const steamMaterial = new THREE.ShaderMaterial({
     varying float vLife;
     void main() {
       vec4 tex = texture2D(uMap, gl_PointCoord);
-      // Quick fade-in at the spout, slow fade-out as the puff drifts up.
       float fadeIn  = smoothstep(0.0, 0.18, vLife);
       float fadeOut = 1.0 - smoothstep(0.55, 1.0, vLife);
       float a = tex.a * fadeIn * fadeOut * 0.09;
@@ -953,22 +858,19 @@ const steamMaterial = new THREE.ShaderMaterial({
 
 const coffeeSteam = new THREE.Points(steamGeo, steamMaterial);
 coffeeSteam.frustumCulled = false;
-coffeeSteam.renderOrder   = 10;     // draw after opaque geometry
-coffeeSteam.visible       = false;  // turned on once we've located CoffeeSmoke
+coffeeSteam.renderOrder   = 10;
+coffeeSteam.visible       = false;
 scene.add(coffeeSteam);
 
 const steamOrigin = new THREE.Vector3();
 let   steamReady  = false;
 
-// Day / night palettes — color targets for setDayNight transitions
 let isDayMode = false;
 let dayNightAnimId = null;
 
-// Ground plane mesh — captured at model load so its color can be tweened
-// between its original daytime tint and a near-midnight-blue at night.
 let groundPlaneMesh = null;
 let groundPlaneDayColor = null;
-const GROUND_NIGHT_COLOR = new THREE.Color(0x5f6163); // dim blue-gray — visible enough that the room's cast shadow reads against the backdrop
+const GROUND_NIGHT_COLOR = new THREE.Color(0x5f6163);
 
 const NIGHT_PALETTE = {
   background:        new THREE.Color(0x5f6163),
@@ -992,27 +894,18 @@ const NIGHT_PALETTE = {
 };
 
 const DAY_PALETTE = {
-  // Warm-tinted sky, but still readable as outdoor blue
   background:        new THREE.Color(0xa6c8e0),
-  // Saturated golden beam — bright streak that lives against a darker room
   beamColor:         new THREE.Color(0xffb050),
   beamIntensity:     2.6,
-  // moonFill becomes a quiet cool sky fill in day — just enough to keep shadows
-  // from going pitch black on the side opposite the sun. Stays out of the way.
   moonColor:         new THREE.Color(0xb8d0e8),
   moonIntensity:     0.6,
-  // Low warm ambient — keeps the room readable but does NOT lift shadows flat
   ambientColor:      new THREE.Color(0xe8dccc),
   ambientIntensity:  0.18,
-  // Hemisphere with a strong warm wood-bounce and modest intensity. The warm
-  // ground tint is what makes undersides of furniture feel cozy.
   hemiSky:           new THREE.Color(0xa6c8e0),
   hemiGround:        new THREE.Color(0xb88858),
   hemiIntensity:     0.4,
-  bulbIntensity:     0,
+  bulbIntensity:     0.6,
   deskLampIntensity: 0,
-  // Warm sun key — does ~all the directional work, casts shadows. This is the
-  // single biggest contributor to "cozy afternoon sun" instead of "showroom".
   sunKeyColor:       new THREE.Color(0xffc278),
   sunKeyIntensity:   2.6,
   moonKeyColor:      new THREE.Color(0x8aa6d0),
@@ -1024,8 +917,8 @@ const DAY_PALETTE = {
 const paperMaterial = new THREE.ShaderMaterial({
   uniforms: {
     uTime: { value: 0 },
-    uSpeed: { value: 10.0 },    // How fast it flutters
-    uStrength: { value: 0.11 }, // How far it bends out
+    uSpeed: { value: 10.0 },
+    uStrength: { value: 0.11 },
   },
   vertexShader: /* glsl */`
     uniform float uTime;
@@ -1037,17 +930,9 @@ const paperMaterial = new THREE.ShaderMaterial({
       vUv = uv;
       vec3 pos = position;
 
-      // uv.y goes from 0 (bottom tip) to 1 (top attached edge)
-      // (1.0 - uv.y) means 0 influence at the top anchor, 1.0 at the loose tip
       float windWeight = pow(1.0 - uv.y, 2.0);
-
-      // Create a high-frequency fluttering motion along the Z/X axis
       float flutter = sin(pos.y * 10.0 + uTime * uSpeed) * cos(uTime * uSpeed * 0.5);
-      
-      // Push the paper outward in the direction of the AC blast (e.g., Z axis)
       pos.z += flutter * uStrength * windWeight;
-      
-      // Add a slight constant lift from the continuous air stream
       pos.y += windWeight * (uStrength * 0.5);
 
       gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(pos, 1.0);
@@ -1056,23 +941,18 @@ const paperMaterial = new THREE.ShaderMaterial({
   fragmentShader: /* glsl */`
     varying vec2 vUv;
     void main() {
-      // Clean, flat, unlit paper look (matching a stylized room)
       gl_FragColor = vec4(0.45, 0.52, 0.49, 1.0);
     }
   `,
   side: THREE.DoubleSide
 });
 
-// Give it 1 horizontal segment, but 10-20 vertical segments so it has joints to flex!
 const paperGeo = new THREE.PlaneGeometry(0.05, 0.3, 1, 15);
 const paperMesh = new THREE.Mesh(paperGeo, paperMaterial);
-
-// Position it right at your AC vent opening
-paperMesh.position.set(0.5, 1.2, -1.8); 
+paperMesh.position.set(0.5, 1.2, -1.8);
 scene.add(paperMesh);
 
 
-// setDayNight — smoothstep-lerps all lights and beam shader between day and night palettes
 function setDayNight(toDay) {
 
   clickSound.currentTime = 0;
@@ -1080,10 +960,6 @@ function setDayNight(toDay) {
   if (toDay === isDayMode) return;
   isDayMode = toDay;
 
-  // Whiteboard shadow: cast + receive sunlight shadows in day, suppress both at night.
-  // When switching to day, force the directional shadow map to re-render so the
-  // pre-baked night map is replaced with one that projects shadows onto the whiteboard.
-  // Traverse children so multi-mesh whiteboards are fully covered, not just the parent.
   if (whiteboardShadow) {
     whiteboardShadow.traverse((child) => {
       if (child.isMesh) {
@@ -1096,9 +972,6 @@ function setDayNight(toDay) {
     }
   }
 
-  // Sun-key shadow map only matters in day mode. Bake once on the transition into
-  // day so the cast shadows are ready for the rest of the fade-in; clear it on
-  // night so we're not paying for a stale shadow pass.
   if (toDay) {
     sunKey.shadow.needsUpdate = true;
   } else {
@@ -1107,8 +980,6 @@ function setDayNight(toDay) {
 
   const to = toDay ? DAY_PALETTE : NIGHT_PALETTE;
 
-  // Ground color target depends on direction — to night, push toward midnight blue;
-  // to day, restore the original daytime tint captured at model load.
   const groundTarget = toDay
     ? (groundPlaneDayColor || GROUND_NIGHT_COLOR)
     : GROUND_NIGHT_COLOR;
@@ -1142,9 +1013,6 @@ function setDayNight(toDay) {
 
   if (dayNightAnimId) cancelAnimationFrame(dayNightAnimId);
 
-  // Shadow maps are pre-baked at load time — never recompute during transitions
-  // (recomputing mid-frame causes shader recompiles and 11fps spikes).
-
   const duration = 1500;
   const t0 = performance.now();
 
@@ -1177,8 +1045,6 @@ function setDayNight(toDay) {
       u.uIntensity.value = THREE.MathUtils.lerp(start.beamIntensity, to.beamIntensity, eased);
     }
 
-    // Tween the ground plane material color toward midnight blue at night /
-    // its captured day color when returning to day.
     if (groundPlaneMesh && groundPlaneMesh.material && start.groundColor) {
       const gm = Array.isArray(groundPlaneMesh.material)
         ? groundPlaneMesh.material[0]
@@ -1197,15 +1063,9 @@ function setDayNight(toDay) {
   step();
 }
 
-// OrbitControls + camera state for default view and escape/focus animations
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// Clamp the orbit so users can't drag the camera under the ground plane
-// (which would reveal the empty sky/void beneath the diorama). PI/2 is the
-// horizon line through the controls target; nudging slightly past it lets
-// the camera dip closer to the floor without dropping below it. Tweak the
-// "+0.12" buffer up/down if you want more/less floor reveal.
 controls.maxPolarAngle = Math.PI / 2 + 0.12;
 controls.minPolarAngle = 0.15;
 
@@ -1220,22 +1080,14 @@ let lastFocusTime = 0;
 const focusCameraPosition = new THREE.Vector3();
 const focusControlsTarget = new THREE.Vector3();
 
-// BMO parallax — spring-based mouse-driven camera drift when focused on BMO.
-// Uses a second-order spring so the camera builds velocity before arriving
-// (small delay, then drifts in fast) rather than a simple lerp.
-//
-// STIFFNESS — how hard the spring pulls toward the target. Higher = faster.
-// DAMPING   — friction that prevents oscillation. Lower = more floaty/overshoot.
 const mouseNDC = new THREE.Vector2();
 const bmoParallaxCurrent  = new THREE.Vector3();
 const bmoParallaxVelocity = new THREE.Vector3(); // spring velocity
 const bmoParallaxTarget   = new THREE.Vector3();
 const BMO_PARALLAX_STRENGTH = 0.1;  // max offset in world units
 const BMO_PARALLAX_STIFFNESS = 80;  // spring pull strength
-const BMO_PARALLAX_DAMPING   = 12;  // 2*sqrt(30)≈11 = critical damping, no bounce
+const BMO_PARALLAX_DAMPING   = 12;
 
-// Scratch vectors for BMO parallax — hoisted out of the render loop so we
-// don't allocate three Vector3s every frame while parallax is active.
 const _bmoForward = new THREE.Vector3();
 const _bmoRight   = new THREE.Vector3();
 const _bmoUp      = new THREE.Vector3();
@@ -1247,9 +1099,6 @@ window.addEventListener('mousemove', (e) => {
   );
 });
 
-// Post-processing — outline, bloom, and output passes via EffectComposer
-// HalfFloatType render targets use 8 bytes/pixel instead of 16 (FloatType),
-// cutting intermediate buffer memory roughly in half while still supporting HDR bloom.
 const composerTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
   type: THREE.HalfFloatType,
   minFilter: THREE.LinearFilter,
@@ -1260,9 +1109,6 @@ const composer = new EffectComposer(renderer, composerTarget);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
-// Bloom runs BEFORE outline so the outline edges are never picked up by bloom.
-// Old order (renderPass → outline → bloom → output) caused bloom to amplify the
-// bright white outline edges, making the whole scene look brighter on hover.
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2)),
   0.18,
@@ -1280,25 +1126,17 @@ composer.addPass(outlinePass);
 const outputPass = new OutputPass();
 composer.addPass(outputPass);
 
-// Raycaster + clickable registry for pointer interactions.
-//
-// clickableObjects holds the *real* meshes/groups in the scene that respond to
-// clicks (BMO, whiteboard, bed, etc.)
-//
-
 const clickableObjects = [];
 const interactionBoundingBoxes = [];
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-
-// registerClickable — adds a target to clickableObjects AND builds an AABB
 
 function registerClickable(target) {
   if (!target || clickableObjects.indexOf(target) !== -1) return;
   clickableObjects.push(target);
 
   const aabb = new THREE.Box3().setFromObject(target);
-  if (aabb.isEmpty()) return; // nothing to proxy (no geometry under this node)
+  if (aabb.isEmpty()) return;
 
   const size   = new THREE.Vector3();
   const center = new THREE.Vector3();
@@ -1318,15 +1156,12 @@ function registerClickable(target) {
   proxy.matrixAutoUpdate = false;
   proxy.updateMatrix();
   proxy.userData.clickableTarget = target;
-  // Keep proxies out of the rendered scene graph as cheaply as possible:
-  // invisible material + no shadows + frustumCulled still applies for raycasts.
   proxy.castShadow = false;
   proxy.receiveShadow = false;
   scene.add(proxy);
   interactionBoundingBoxes.push(proxy);
 }
 
-// unregisterClickable — removes a target from both arrays and disposes its proxy.
 function unregisterClickable(target) {
   const idx = clickableObjects.indexOf(target);
   if (idx !== -1) clickableObjects.splice(idx, 1);
@@ -1343,9 +1178,6 @@ function unregisterClickable(target) {
   }
 }
 
-// pointerdown — handles clicks on clickable objects: switch, TV screen, BMO, bed, others.
-// Raycast hits a proxy from interactionBoundingBoxes; the real clickable is in userData.
-// Gated on appReady so clicks during title / picker / loading phases are ignored.
 window.addEventListener('pointerdown', (event) => {
   if (!appReady) return;
 
@@ -1360,8 +1192,6 @@ window.addEventListener('pointerdown', (event) => {
   if (intersects.length > 0) {
     const selected = intersects[0].object.userData.clickableTarget;
 
-    // Switch detection: compare against the registered clickable directly —
-    // no parent-chain walk needed since the proxy already resolves to it.
     if (selected === switchMesh ||
         selected.name === 'Object_0003_1' ||
         selected.name === 'switch' ||
@@ -1377,7 +1207,6 @@ window.addEventListener('pointerdown', (event) => {
       return;
     }
 
-    // Only play zoom sound if this is a fresh focus (not re-clicking an already focused object)
     if (selected !== selectedObject) {
       zoomIn.volume = 0.05;
       zoomIn.currentTime = 0;
@@ -1408,19 +1237,16 @@ window.addEventListener('pointerdown', (event) => {
         }
         return;
       }
-      // First click — focus on BMO and start loading the video
       isFocusedOnBMO = true;
       selectedObject = selected;
       outlinePass.selectedObjects = [selected];
       console.log('BMO focused:', selected.name);
       if (window._loadBMOVideo) window._loadBMOVideo();
-      // Enable screen hover + click now that BMO is focused (creates a proxy too)
       if (tvScreenMesh) registerClickable(tvScreenMesh);
       focusOnObject(selected);
       return;
     }
 
-    // Screen click — only reachable after BMO is focused (screen registered above)
     if (selected === tvScreenMesh) {
       if (!videoReady || !tvVideo) {
         console.log('Video is not ready yet.');
@@ -1456,7 +1282,6 @@ window.addEventListener('pointerdown', (event) => {
     }
 
     isFocusedOnBMO = false;
-    // Tear down the screen's proxy + clickable entry — BMO is no longer focused
     if (tvScreenMesh) unregisterClickable(tvScreenMesh);
     selectedObject = selected;
     outlinePass.selectedObjects = [selected];
@@ -1469,12 +1294,6 @@ window.addEventListener('pointerdown', (event) => {
   }
 });
 
-// processPointerHover — throttled hover raycaster, runs once per animation frame.
-// Now raycasts against interactionBoundingBoxes (small invisible AABB proxies)
-// instead of the real clickableObjects hierarchy. Recursion is explicitly off:
-// each proxy is a single 12-tri box, so a hover is at most N box tests where
-// N is the number of registered clickables (~6). Previously this could chew
-// through thousands of triangles per mouse wiggle.
 let pendingPointerEvent = null;
 let pointerRaycastQueued = false;
 
@@ -1507,9 +1326,6 @@ window.addEventListener('pointermove', (event) => {
   }
 });
 
-// GLTFLoader — loads the main scene GLB, sets up meshes, lights, and screen.
-// Wrapped in startSceneLoad() so the GLB fetch only fires after the user
-// explicitly picks the 3D experience from the picker.
 const loader = new GLTFLoader();
 
 // please never remove, this allows it to even load in browsers
@@ -1544,9 +1360,7 @@ function startSceneLoad() {
       }
 
       if (object.isMesh) {
-        // Only large structural meshes cast shadows — small props only receive them.
-        // This keeps shadow maps clean without computing tiny prop shadows every frame.
-        const name = object.name || '';
+          const name = object.name || '';
         const isShadowCaster =
           /floor|wall|ceiling|room|cube|plane|bed|desk|shelf|door|window|whiteboard|bookcase|dresser|wardrobe|table|chair|sofa|couch|lamp|monitor|computer|Cube|Plane|Box/i.test(name);
         object.castShadow = isShadowCaster;
@@ -1563,7 +1377,6 @@ function startSceneLoad() {
         }
       }
 
-      // Window beam shader — replaces the Emission mesh material with a custom volumetric GLSL shader
       const beam = gltf.scene.getObjectByName('Emission');
       if (beam) {
         beam.geometry.computeBoundingBox();
@@ -1674,9 +1487,6 @@ function startSceneLoad() {
 
 
     
-    // Walk up from the BMO mesh to the top-level group that sits directly under
-    // the scene root — that's the full BMO object (body, buttons, screen, etc.).
-    // All textures in that subtree are protected from downsampling.
     const bmoMeshRef = model.getObjectByName('leftArm002_8');
     let bmoRoot = bmoMeshRef;
     if (bmoRoot) {
@@ -1687,15 +1497,8 @@ function startSceneLoad() {
       }
     }
 
-    // Downsample any texture larger than 2048px — BMO's subtree stays at full resolution.
     downsampleTextures(model, 2048, bmoRoot ? [bmoRoot] : []);
 
-    // Pre-bake ALL shadow maps right after the model loads so day/night transitions
-    // never trigger a mid-frame shadow recompute or shader recompile. moonKey and
-    // sunKey are flagged needsUpdate at construction, but that fires before the
-    // model is in the scene — re-flagging here ensures their first bake actually
-    // contains the room geometry (otherwise first-load night has no moon shadows
-    // and looks brighter than the post-toggle state).
     bulbLight.castShadow = true;
     bulbLight.shadow.needsUpdate = true;
     moonFill.castShadow = true;
@@ -1703,16 +1506,10 @@ function startSceneLoad() {
     sunKey.shadow.needsUpdate = true;
     moonKey.shadow.needsUpdate = true;
 
-    // Ground plane — capture its original (day) color, then immediately tint
-    // it near midnight blue since the scene boots in night mode. The day
-    // color is preserved for setDayNight() to restore on the toggle to day.
     groundPlaneMesh = model.getObjectByName('GroundPlane') || model.getObjectByName('Plane004');
     if (groundPlaneMesh && groundPlaneMesh.material) {
-      // Clone the material so editing color doesn't bleed into anything
-      // else that might share this material reference.
       if (Array.isArray(groundPlaneMesh.material)) {
         groundPlaneMesh.material = groundPlaneMesh.material.map(m => m.clone());
-        // Use the first material's color as the tweenable target.
         const first = groundPlaneMesh.material[0];
         if (first && first.color) {
           groundPlaneDayColor = first.color.clone();
@@ -1729,8 +1526,6 @@ function startSceneLoad() {
       console.warn('No mesh named "GroundPlane" or "Plane004" found — night-mode ground tint disabled.');
     }
 
-    // Register clickable objects from the loaded model.
-    // Each registerClickable() also builds an AABB proxy in interactionBoundingBoxes.
     ukulele = model.getObjectByName('ukulele');
     if (ukulele) registerClickable(ukulele);
     const bmoMesh   = model.getObjectByName('leftArm002_8');
@@ -1739,12 +1534,7 @@ function startSceneLoad() {
     whiteboardShadow = whiteboard;
   
 
-    // Pre-warm BOTH whiteboard shadow program variants up front.
-    //
-
     if (whiteboardShadow) {
-      // Variant B FIRST — night state (the initial mode). This is the shader
-      // program the very first frame needs, so we compile it synchronously.
       whiteboardShadow.traverse((child) => {
         if (child.isMesh) {
           child.receiveShadow = false;
@@ -1753,9 +1543,6 @@ function startSceneLoad() {
       });
       renderer.compile(scene, camera);
 
-      // Variant A — day state (shadows on). Deferred to idle so it doesn't
-      // block first paint. Trade-off: very first day-toggle MAY show a tiny
-      // compile stutter if the user toggles before this idle slot fires.
       const scheduleIdle = window.requestIdleCallback
         ? (cb) => window.requestIdleCallback(cb, { timeout: 1500 })
         : (cb) => setTimeout(cb, 100);
@@ -1767,8 +1554,6 @@ function startSceneLoad() {
           }
         });
         renderer.compile(scene, camera);
-        // Restore night state (the active mode at this point) so we don't
-        // accidentally leave shadows on after the warm-up.
         whiteboardShadow.traverse((child) => {
           if (child.isMesh) {
             child.receiveShadow = false;
@@ -1809,14 +1594,10 @@ function startSceneLoad() {
    
 
 
-    // Coffee steam emitter — find the CoffeeSmoke mesh, hide it, and use its
-    // world position as the spawn point for the steam particle system.
     const coffeeSmoke = model.getObjectByName('CoffeeSmoke');
     if (coffeeSmoke) {
-      coffeeSmoke.visible = false; // mesh is just a marker; real effect is the Points cloud
+      coffeeSmoke.visible = false;
       coffeeSmoke.getWorldPosition(steamOrigin);
-      // Seed all particles at the origin so the first few frames don't show
-      // any stale (0,0,0) positions before the loop respawns them naturally.
       for (let i = 0; i < STEAM_COUNT; i++) {
         const ix = i * 3;
         steamPositions[ix    ] = steamOrigin.x;
@@ -1830,7 +1611,6 @@ function startSceneLoad() {
       console.warn('No mesh named "CoffeeSmoke" found — steam disabled.');
     }
 
-    // Anchor desk lamp light to Cylinder005 mesh position
     const deskLampMesh = model.getObjectByName('Cylinder005');
     if (deskLampMesh) {
       deskLampMesh.getWorldPosition(deskLamp.position);
@@ -1840,14 +1620,12 @@ function startSceneLoad() {
         ? DAY_PALETTE.deskLampIntensity
         : NIGHT_PALETTE.deskLampIntensity;
       window.showLampPos();
-      console.log('Adjust live with: nudgeLamp(dx,dy,dz)  setLampPos(x,y,z)  toggleLampHelper()');
     } else {
       console.warn('No mesh named "Cylinder005" found — desk lamp light disabled.');
       deskLamp.intensity = 0;
       deskLampBulbMesh.visible = false;
     }
 
-    // BMO screen — finds the screen mesh and sets up a canvas video texture
     const tv = model.getObjectByName('tv') || model;
     const screen = tv.getObjectByName('bmo_face')
       || tv.getObjectByName('Screen')
@@ -1861,7 +1639,7 @@ function startSceneLoad() {
       video.loop = false;
       video.muted = true;
       video.playsInline = true;
-      video.preload = 'none'; // lazy — don't fetch until BMO is first focused
+      video.preload = 'none';
       video.crossOrigin = 'anonymous';
 
       let screenMode = 'video';
@@ -1880,10 +1658,6 @@ function startSceneLoad() {
 
       tvScreenMesh = screen;
       tvVideo = video;
-      // screen is intentionally NOT added to clickableObjects at load — hover
-      // and click on the screen mesh are gated behind BMO focus. Interaction
-      // before focus is handled entirely through BMO's body (leftArm002_8).
-
       const g = screen.geometry;
       g.computeBoundingBox();
       const centerLocal = g.boundingBox.getCenter(new THREE.Vector3());
@@ -1893,8 +1667,6 @@ function startSceneLoad() {
 
       normalizeMeshUVs(screen);
 
-      // --- VideoTexture pipeline 
- 
       const videoTex = new THREE.VideoTexture(video);
       videoTex.colorSpace     = THREE.SRGBColorSpace;
       videoTex.minFilter      = THREE.LinearFilter;
@@ -1916,8 +1688,6 @@ function startSceneLoad() {
       const screenMaterial = new THREE.MeshBasicMaterial({ map: solidTex, toneMapped: false });
       screen.material = screenMaterial;
 
-      // setBMOScreenSolidColor — repaint the 4×4 solid texture and swap it in.
-      // Kept as the same external API the rest of the file already calls.
       function setBMOScreenSolidColor(color = '#c9f4df') {
         screenMode = 'solid';
         solidCtx.fillStyle = color;
@@ -1937,9 +1707,6 @@ function startSceneLoad() {
         console.error('Video failed to load:', video.error);
       });
 
-      // Once the video has actually decoded a frame after the initial seek,
-      // swap the screen over to the VideoTexture. The texture will then show
-      // the still frame as the idle image until the user clicks play.
       video.addEventListener('seeked', () => {
         if (video.paused && !isVideoPlaying) {
           screenMode = 'video';
@@ -1950,8 +1717,6 @@ function startSceneLoad() {
         }
       }, { once: true });
 
-      // Don't load now — loadVideo() is called the first time BMO is focused.
-      // This keeps the video file (50-300MB) out of memory until it's actually needed.
       let videoLoadStarted = false;
       function loadVideo() {
         if (videoLoadStarted) return;
@@ -1959,10 +1724,7 @@ function startSceneLoad() {
         video.load();
         video.currentTime = 0.066;
       }
-      // Expose so the BMO click handler (outside this closure) can trigger it.
       window._loadBMOVideo = loadVideo;
-
-      // No per-frame TV update needed — VideoTexture handles it natively.
       updateTV = null;
     }
 
@@ -1996,7 +1758,6 @@ function startSceneLoad() {
       baseRotR: rightLeg ? rightLeg.rotation.clone() : null
     };
 
-// Ground Plane 
     const FRAMING_EXCLUDE = /ground/i;
     const box = new THREE.Box3();
     model.traverse((obj) => {
@@ -2005,7 +1766,6 @@ function startSceneLoad() {
       const meshBox = new THREE.Box3().setFromObject(obj);
       if (!meshBox.isEmpty()) box.union(meshBox);
     });
-    // Fallback in case nothing matched (e.g. all meshes excluded)
     if (box.isEmpty()) box.setFromObject(model);
 
     const size = box.getSize(new THREE.Vector3()).length();
@@ -2021,18 +1781,12 @@ function startSceneLoad() {
 
     dismissLoadingScreen();
     dracoLoader.dispose();
-    // Now that the GLB is in, warm up the remaining SFX in the background so
-    // the user's first click/zoom isn't waiting on a cold fetch.
     warmAudio();
   },
   (xhr) => {
     const bar = document.getElementById('loadingBarFill');
     const pct = document.getElementById('loadingPercent');
-    // Production CDNs (Vercel + br/gzip) usually strip Content-Length on
-    // chunked responses, so xhr.lengthComputable is false. In that case we
-    // estimate against the known Draco-compressed GLB size so the bar still
-    // moves accurately for the user instead of going indeterminate.
-    const ESTIMATED_GLB_BYTES = 68_309_076; // size of backupisometricScene.glb
+    const ESTIMATED_GLB_BYTES = 68_309_076;
     const total = (xhr && xhr.lengthComputable && xhr.total > 0)
       ? xhr.total
       : ESTIMATED_GLB_BYTES;
@@ -2055,7 +1809,6 @@ function startSceneLoad() {
 );
 }
 
-// FPS logger — small overlay in the top-left corner showing live frame rate
 const fpsDisplay = document.createElement('div');
 fpsDisplay.style.cssText = `
   position: fixed;
@@ -2078,8 +1831,7 @@ fpsDisplay.textContent = 'FPS: --';
 let fpsFrameCount = 0;
 let fpsLastTime = performance.now();
 
-// Adaptive quality — tracks FPS for 3s after load, auto-degrades on slow machines
-let perfMode = false;           // true = bloom removed, lower pixel ratio
+let perfMode = false;
 let perfSampleFrames = 0;
 let perfSampleStart  = performance.now();
 let perfModeChecked  = false;
@@ -2119,7 +1871,6 @@ function updateFPS() {
   }
 }
 
-// animate — main render loop, updates TV, leg sway, focus animation, and composer
 function animate() {
   requestAnimationFrame(animate);
   updateFPS();
@@ -2131,8 +1882,6 @@ function animate() {
     paperMaterial.uniforms.uTime.value = performance.now() * 0.001;
   }
 
-  // Dust motes — only step the sim when they're actually visible (day mode).
-  // Skipping this loop in night mode keeps the per-frame cost at ~0 there.
   if (dustMaterial.opacity > 0.01) {
     const arr = dustGeo.attributes.position.array;
     const t = performance.now() * 0.001;
@@ -2141,7 +1890,6 @@ function animate() {
       arr[ix    ] += dustVelocities[ix    ] * 0.016 + Math.sin(t + dustSeeds[i]) * 0.0008;
       arr[ix + 1] += dustVelocities[ix + 1] * 0.016;
       arr[ix + 2] += dustVelocities[ix + 2] * 0.016 + Math.cos(t + dustSeeds[i]) * 0.0008;
-      // wrap inside room volume so motes recirculate forever
       if (arr[ix + 1] >  2.6) arr[ix + 1] = 0;
       if (arr[ix    ] >  2.0) arr[ix    ] = -2.0;
       if (arr[ix    ] < -2.0) arr[ix    ] =  2.0;
@@ -2151,13 +1899,6 @@ function animate() {
     dustGeo.attributes.position.needsUpdate = true;
   }
 
-  // Coffee steam — wave-like ribbon, not discrete puffs.
-  // Each particle's position is computed directly from its `life` (0..1) so it
-  // traces a vertical sine path from the spout. Because every particle follows
-  // the SAME wave shape (with only a tiny per-particle phase jitter via
-  // steamSeeds), they merge into a continuous wavy ribbon instead of reading
-  // as individual dots. A slow global time term makes the whole ribbon drift
-  // sideways gently, like real rising steam catching air currents.
   if (steamReady) {
     const pos     = steamGeo.attributes.position.array;
     const lifeArr = steamGeo.attributes.aLife.array;
@@ -2167,13 +1908,11 @@ function animate() {
     const globalDriftZ = Math.cos(t * 0.4) * 0.6;
     for (let i = 0; i < STEAM_COUNT; i++) {
       const ix = i * 3;
-      lifeArr[i] += dt * 0.22;          // ~4.5s for a particle to complete its rise
-      if (lifeArr[i] >= 1.0) lifeArr[i] -= 1.0;  // wrap (no respawn at origin — continuous ribbon)
+      lifeArr[i] += dt * 0.22;
+      if (lifeArr[i] >= 1.0) lifeArr[i] -= 1.0;
 
       const life  = lifeArr[i];
       const seed  = steamSeeds[i];
-      // Wave amplitude widens slightly with height — base width near the spout,
-      // wider sway near the top, the way real steam disperses as it cools.
       const widen = 0.4 + life * 1.1;
       const phase = life * STEAM_WAVE_FREQ + seed + globalDriftX;
       pos[ix    ] = steamOrigin.x + Math.sin(phase) * STEAM_WAVE_AMP * widen;
@@ -2194,27 +1933,16 @@ function animate() {
 
   animateObjectFocus();
 
-  // BMO parallax — only active once the camera has fully settled on BMO
-  // (isFocusingObject false) and we're not in the middle of escaping.
-  // Move in camera-local right/up space so the offset is always perpendicular
-  // to the view direction — this prevents any change in camera-to-target
-  // distance (which would read as a zoom).
   if (isFocusedOnBMO && !isFocusingObject && !isEscapeAnimating) {
-    controls.enabled = false; // hand-drive the camera; no OrbitControls interference
-
-    const dt = Math.min(1 / 30, 1 / 60); // fixed step — good enough for a visual spring
-
-    // Build camera-local axes from the settled focus position — reuses scratch
-    // vectors hoisted above so this branch allocates zero per frame.
+    controls.enabled = false;
+    const dt = Math.min(1 / 30, 1 / 60);
     _bmoForward.subVectors(focusControlsTarget, focusCameraPosition).normalize();
     _bmoRight.crossVectors(_bmoForward, camera.up).normalize();
     _bmoUp.crossVectors(_bmoRight, _bmoForward).normalize();
 
-    // Target offset in world space, expressed along camera-local right/up
     bmoParallaxTarget.copy(_bmoRight).multiplyScalar(mouseNDC.x * BMO_PARALLAX_STRENGTH)
       .addScaledVector(_bmoUp, mouseNDC.y * BMO_PARALLAX_STRENGTH * 0.6);
 
-    // Spring physics: acceleration = stiffness*(target-current) - damping*velocity
     const ax = BMO_PARALLAX_STIFFNESS * (bmoParallaxTarget.x - bmoParallaxCurrent.x) - BMO_PARALLAX_DAMPING * bmoParallaxVelocity.x;
     const ay = BMO_PARALLAX_STIFFNESS * (bmoParallaxTarget.y - bmoParallaxCurrent.y) - BMO_PARALLAX_DAMPING * bmoParallaxVelocity.y;
     const az = BMO_PARALLAX_STIFFNESS * (bmoParallaxTarget.z - bmoParallaxCurrent.z) - BMO_PARALLAX_DAMPING * bmoParallaxVelocity.z;
@@ -2229,7 +1957,6 @@ function animate() {
     camera.lookAt(focusControlsTarget);
   } else {
     if (!isFocusedOnBMO) {
-      // Reset so there's no pop or leftover momentum when re-focusing later
       bmoParallaxCurrent.set(0, 0, 0);
       bmoParallaxVelocity.set(0, 0, 0);
     }
@@ -2240,15 +1967,10 @@ function animate() {
 
   outlinePass.enabled = !transitioning && outlinePass.selectedObjects.length > 0;
 
-  // Bloom stays on at all times — including during camera transitions —
-  // so the screen glow is visible during the zoom-in to BMO.
-
-  // Always go through the composer so OutputPass handles tone mapping consistently.
   composer.render();
 }
 animate();
 
-// animateEscape — smoothly damps the camera back to the default view on Escape
 function animateEscape() {
   if (!isEscapeAnimating) return;
 
@@ -2277,7 +1999,6 @@ function animateEscape() {
     controls.update();
     isEscapeAnimating = false;
     controls.enabled = true;
-    // Clear focused object so Escape from the default view never re-triggers sounds
     selectedObject = null;
     outlinePass.selectedObjects = [];
     return;
@@ -2286,37 +2007,19 @@ function animateEscape() {
   requestAnimationFrame(animateEscape);
 }
 
-// beforeunload — release GPU resources promptly when navigating away.
-// Without this, the renderer/textures/render-targets sit in VRAM until the
-// browser GC eventually decides to free them (can take several seconds).
 window.addEventListener('beforeunload', () => {
-  // Stop the render loop
   renderer.setAnimationLoop(null);
-
-  // Dispose post-processing chain
   composer.passes.forEach(pass => { if (pass.dispose) pass.dispose(); });
   composerTarget.dispose();
-
-  // Dispose inline geometries and materials created in JS
   bulbMesh.geometry.dispose();
   bulbMesh.material.dispose();
   deskLampBulbMesh.geometry.dispose();
   deskLampBulbMesh.material.dispose();
-
-  // Dispose BMO canvas texture if it was created
   if (tvScreenMesh?.material?.map) tvScreenMesh.material.map.dispose();
-
-  // Dispose the beam shader material
   if (window._beam?.material) window._beam.material.dispose();
-
-  // Renderer last — frees the WebGL context and all remaining GPU memory
   renderer.dispose();
 });
 
-// resize — coalesced via rAF so rapid drags (window snap, devtools toggle) only
-// reallocate render targets once per frame instead of N times per drag. Each
-// composer/outline/bloom setSize() is a full GPU reallocation; without this
-// guard, dragging the window edge can stall the page for 100s of ms.
 let resizePending = false;
 window.addEventListener('resize', () => {
   if (resizePending) return;
@@ -2333,16 +2036,13 @@ window.addEventListener('resize', () => {
     composer.setSize(width, height);
     composerTarget.setSize(width, height);
 
-    // This forces the hidden outline selection texture to match the viewport pixel-for-pixel
     outlinePass.setSize(width, height);
     bloomPass.setSize(Math.floor(width / 2), Math.floor(height / 2));
   });
 });
 
-// keydown (Escape) — triggers the camera escape animation back to default view
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !isEscapeAnimating && !hasOpenedStaticScreen && !helpOpen) {
-    // Only sound if the camera was actually zoomed in on something
     if (selectedObject !== null || isFocusingObject) {
       zoomOut.currentTime = 0;
       zoomOut.volume = 0.05;
@@ -2352,7 +2052,6 @@ window.addEventListener('keydown', (event) => {
     isEscapeAnimating = true;
     lastEscapeTime = performance.now();
     controls.enabled = false;
-    // Tear down the screen's proxy + clickable entry when escaping back to default view
     isFocusedOnBMO = false;
     if (tvScreenMesh) unregisterClickable(tvScreenMesh);
 
@@ -2361,7 +2060,6 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
-// focusOnObject — moves the camera to focus on a clicked object using presets or bounding box
 function focusOnObject(object) {
   isEscapeAnimating = false;
 
@@ -2399,7 +2097,6 @@ function focusOnObject(object) {
   controls.enabled = false;
 }
 
-// animateObjectFocus — per-frame damp toward focusCameraPosition/focusControlsTarget
 function animateObjectFocus() {
   if (!isFocusingObject) return;
 
@@ -2436,7 +2133,6 @@ function animateObjectFocus() {
   }
 }
 
-// logCurrentViewForObject — logs camera/target offsets for the selected object (press L)
 function logCurrentViewForObject(object) {
   const box = new THREE.Box3().setFromObject(object);
   const center = box.getCenter(new THREE.Vector3());
@@ -2450,7 +2146,6 @@ ${object.name}: {
 `);
 }
 
-// keydown (L) — logs the current camera offset for the selected object into the console
 window.addEventListener('keydown', (event) => {
   if (event.key.toLowerCase() === 'l') {
     if (!selectedObject) { console.log('No object selected.'); return; }
@@ -2458,22 +2153,10 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
-// downsampleTextures — walks all mesh materials and resizes any texture image
-// larger than maxPx down to maxPx on its longest side. Saves 200-400MB since
-// uncompressed 2048×2048 RGBA = 16MB each.
-//
-// IMPORTANT — chunked across `requestIdleCallback` (one texture per idle slot)
-// so the canvas resizes never block first paint. The trade-off: the very first
-// frame uploads textures at their original resolution (brief VRAM spike), then
-// each texture is replaced with a downsampled version as the browser gets idle
-// time. End state matches the old synchronous version, but the scene is
-// interactive immediately instead of after a 500ms-2s stall.
-// protectRoots: array of Object3D whose entire subtree is left at full resolution.
 function downsampleTextures(model, maxPx = 1024, protectRoots = []) {
   const seen = new Set();
   const TEXTURE_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap'];
 
-  // Collect every texture UUID belonging to protected subtrees (e.g. BMO).
   const protectedUUIDs = new Set();
   protectRoots.forEach(root => {
     if (!root) return;
@@ -2486,8 +2169,6 @@ function downsampleTextures(model, maxPx = 1024, protectRoots = []) {
     });
   });
 
-  // Pass 1 (fast, cheap) — collect every texture that needs resizing into a flat
-  // queue. Just a traversal + filter; no canvas work yet.
   const queue = [];
   model.traverse(o => {
     if (!o.isMesh) return;
@@ -2497,7 +2178,7 @@ function downsampleTextures(model, maxPx = 1024, protectRoots = []) {
         const tex = mat[slot];
         if (!tex || seen.has(tex.uuid)) return;
         seen.add(tex.uuid);
-        if (protectedUUIDs.has(tex.uuid)) return; // keep BMO at full res
+        if (protectedUUIDs.has(tex.uuid)) return;
         const img = tex.image;
         if (!img || !img.width) return;
         if (img.width <= maxPx && img.height <= maxPx) return;
@@ -2508,8 +2189,6 @@ function downsampleTextures(model, maxPx = 1024, protectRoots = []) {
 
   if (queue.length === 0) return;
 
-  // Pass 2 (deferred) — process one texture per idle slot. Falls back to rAF on
-  // browsers without requestIdleCallback (Safari).
   const schedule = window.requestIdleCallback
     ? (cb) => window.requestIdleCallback(cb, { timeout: 500 })
     : (cb) => requestAnimationFrame(cb);
@@ -2518,7 +2197,6 @@ function downsampleTextures(model, maxPx = 1024, protectRoots = []) {
     const tex = queue.shift();
     if (!tex) return;
     const img = tex.image;
-    // Re-check in case the texture was disposed between scheduling and now.
     if (img && img.width && (img.width > maxPx || img.height > maxPx)) {
       const scale = maxPx / Math.max(img.width, img.height);
       const w = Math.max(1, Math.round(img.width  * scale));
@@ -2536,7 +2214,6 @@ function downsampleTextures(model, maxPx = 1024, protectRoots = []) {
   schedule(processNext);
 }
 
-// normalizeMeshUVs — remaps UV coordinates to [0,1] range for canvas texture display
 function normalizeMeshUVs(mesh) {
   const uv = mesh.geometry.attributes.uv;
   if (!uv) return;
@@ -2558,7 +2235,6 @@ function normalizeMeshUVs(mesh) {
   uv.needsUpdate = true;
 }
 
-// showStaticScreen — fades to mint cover and navigates to the BMO desktop page
 function showStaticScreen() {
   if (tvVideo) {
     tvVideo.pause();
@@ -2569,17 +2245,10 @@ function showStaticScreen() {
 
 
   setTimeout(() => {
-    // Navigate to the .html path, not the clean /bmo_desktop URL. The clean
-    // URL only resolves on Vercel (via vercel.json cleanUrls) — Vite's dev
-    // server and `vite preview` don't know that rule, so /bmo_desktop falls
-    // back to index.html and you land on the 3D title screen at that URL.
-    // Going through /bmo_desktop.html works everywhere: dev/preview serve the
-    // file directly, and Vercel transparently 301s to /bmo_desktop.
     window.location.href = '/bmo_desktop.html';
   }, 260);
 }
 
-// zoomToScreenThenShowStatic — zooms the camera into the TV screen then calls showStaticScreen
 function zoomToScreenThenShowStatic() {
   if (!tvScreenMesh || hasOpenedStaticScreen) return;
   hasOpenedStaticScreen = true;

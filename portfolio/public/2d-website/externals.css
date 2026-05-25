@@ -988,9 +988,11 @@ background-color: white;
 
 /* The Specific Colors */
 .bg-primary { background-color: var(--green);; }     /* Neon Green */
-.bg-secondary { background-color: #ffd000; }   /* Magenta */
-.bg-accent { background-color: #00ffff; }      /* Cyan */
-.bg-destructive { background-color: #ff4500; } /* Orange/Red */
+.bg-secondary { background-color: #ffd000; }   
+.bg-accent { background-color: #00ffff; }     
+.bg-destructive { background-color: #ff4500; }
+.bg-purple { background-color: #b420e1; }
+.bg-blue { background-color: #2962e8; }
 
 
 .animarrow {
