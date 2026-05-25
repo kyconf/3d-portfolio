@@ -1066,7 +1066,7 @@ function setDayNight(toDay) {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-controls.maxPolarAngle = Math.PI / 2 + 0.12;
+controls.maxPolarAngle = Math.PI / 2 - 0.05;
 controls.minPolarAngle = 0.15;
 
 const defaultCameraPosition = new THREE.Vector3();
@@ -1773,6 +1773,7 @@ function startSceneLoad() {
 
     camera.position.copy(center.clone().add(new THREE.Vector3(size*1.1, size*0.4, size*1.1)));
     controls.target.copy(center);
+    controls.maxDistance = size * 1.8;
     camera.lookAt(center);
     controls.update();
 
