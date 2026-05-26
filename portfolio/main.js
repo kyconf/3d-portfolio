@@ -88,7 +88,8 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
 document.body.appendChild(renderer.domElement);
-renderer.domElement.style.visibility = 'hidden';
+renderer.domElement.style.opacity = '0';
+renderer.domElement.style.transition = 'opacity 0.9s ease-out';
 
 // Disable text/cursor selection on all elements globally
 const noSelectStyle = document.createElement('style');
@@ -420,7 +421,7 @@ function showPicker() {
 
 titleScreen.addEventListener('click', () => {
   titleScreen.classList.add('fade-out');
-  showPicker();
+  setTimeout(() => showPicker(), 220);
   setTimeout(() => titleScreen.remove(), 500);
 }, { once: true });
 
@@ -456,7 +457,7 @@ function dismissLoadingScreen() {
     loadingScreen.classList.add('fade-out');
     setTimeout(() => {
       loadingScreen.remove();
-      renderer.domElement.style.visibility = 'visible';
+      renderer.domElement.style.opacity = '1';
       appReady = true;
     }, 700);
   }, 250);
