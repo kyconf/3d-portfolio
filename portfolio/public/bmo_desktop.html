@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BMO OS v1.0</title>
+<title>kyle's portfolio</title>
+<link rel="icon" type="image/png" href="bmoicon2.png">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;700&family=Silkscreen&family=DM+Mono&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
@@ -333,10 +334,14 @@ body {
     position:absolute;bottom:52px;left:20px;z-index:1;
     font-family:'Pixelify Sans',sans-serif;font-size:9px;
     color:var(--bmo-teal);text-align:center;
+    cursor:pointer;
   }
   .pixel-football canvas{
     image-rendering:pixelated;display:block;margin:0 auto 2px;
+    transition:transform 0.1s;
   }
+  .pixel-football:hover canvas{ transform:scale(1.1); }
+  .pixel-football:active canvas{ transform:scale(0.9); }
 
   /* === Screen-on / eye-adjust intro =====================================
      Fires once on page load. Two effects layered:
@@ -433,7 +438,7 @@ body {
       <div class="file-line"></div>
     </div>
   </div>
-  <span class="file-label">portfolio.html</span>
+  <span class="file-label">portfolio</span>
 </div>
 
 <!-- Terminal Window -->
@@ -444,7 +449,7 @@ body {
       <span class="btn-min" onclick="toggleWindow('terminal')"></span>
       <span class="btn-max" onclick="maximizeWindow('terminal')"></span>
     
-      <span class="btn-close" onclick="closeWindow('terminal')">x</span>  
+      <span class="btn-close" onclick="closeWindow('terminal')"></span>  
     </div>
   </div>
   <div class="window-body" style="overflow-y:auto;">
@@ -457,10 +462,10 @@ body {
   <div class="titlebar">
     BMO BROWSER
     <div class="titlebar-buttons">
-           <span class="btn-min" onclick="toggleWindow('browser')">__</span>
+           <span class="btn-min" onclick="toggleWindow('browser')"></span>
        <span class="btn-max" onclick="maximizeWindow('browser')"></span>
  
-      <span class="btn-close" onclick="closeWindow('browser')">x</span>
+      <span class="btn-close" onclick="closeWindow('browser')"></span>
     </div>
   </div>
   <div class="address-bar">
@@ -484,9 +489,9 @@ body {
 </div>
 
 <!-- Football pixel art -->
-<div class="pixel-football">
+<div class="pixel-football" onclick="openTerminal()">
   <canvas id="footballCanvas" width="40" height="40"></canvas>
-  football
+  terminal
 </div>
 
 <div class="version">BMO OS v2.0</div>
@@ -641,20 +646,20 @@ updateClock();setInterval(updateClock,10000);
 
 // Terminal boot sequence
 const bootLines=[
-  ['> bmo boot sequence!','t-green'],
-  ['  loading fun modules...... OK','t-green-dim'],
+  ['> bmo boot sequence','t-green'],
+  ['  loading node modules...... OK','t-green-dim'],
   ['  mounting /dev/controller.. OK','t-green-dim'],
   ['  camera: ready!','t-blue-dim'],
-  ['  memory: lots and lots!','t-blue-dim'],
+  ['  memory: enough','t-blue-dim'],
   ['',''],
   ['> who wants to play video games?','t-yellow'],
-  ['  scanning favorite game cartridges...','t-gray'],
+  ['  scanning favorite games ...','t-gray'],
   ['  [1] pokemon emerald','t-blue'],
   ['  [2] undertale','t-blue'],
   ['  [3] minecraft','t-blue'],
   ['  [4] animal crossing','t-yellow'],
   ['',''],
-  ['> bmo is the greatest!','t-yellow'],
+  ['> click portfolio.sh to start!','t-yellow'],
 ];
 
 const npmLines=[
@@ -664,14 +669,14 @@ const npmLines=[
   ['> portfolio@1.0.0 dev','t-gray'],
   ['> vite','t-gray'],
   ['',''],
-  ['  VITE v5.4.19  ready in 342ms','t-green'],
+  ['  VITE v5.4.19  ready in 143ms','t-green'],
   ['',''],
-  ['  ➜  Local:   http://localhost:3000/','t-blue'],
-  ['  ➜  Network: http://192.168.1.42:3000/','t-blue-dim'],
+  ['  ➜  Local:   http://localhost:5173/','t-blue'],
+  ['  ➜  Network: use --host to expose','t-blue-dim'],
   ['  ➜  press h + enter to show help','t-gray'],
   ['',''],
-  ['  ♥ bmo is serving portfolio.html!','t-yellow'],
-  ['  GET /portfolio.html 200 12ms','t-green-dim'],
+  ['  2D portfolio is live!','t-yellow'],
+
 ];
 
 const term=document.getElementById('terminal');
@@ -810,6 +815,15 @@ fx.fillStyle='#4ac8e8';
 fx.fillRect(22,24,4,3);
 fx.fillStyle='#3da87a';
 fx.fillRect(10,32,4,4);fx.fillRect(26,32,4,4);
+
+// Open terminal (show if hidden)
+function openTerminal(){
+  const win = document.getElementById('terminalWindow');
+  const taskBtn = document.getElementById('taskTerminal');
+  win.classList.remove('win-hidden');
+  taskBtn.classList.remove('task-hidden');
+}
+
 </script>
 </body>
 </html>
