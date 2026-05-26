@@ -88,6 +88,7 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
 document.body.appendChild(renderer.domElement);
+renderer.domElement.style.visibility = 'hidden';
 
 // Disable text/cursor selection on all elements globally
 const noSelectStyle = document.createElement('style');
@@ -455,6 +456,7 @@ function dismissLoadingScreen() {
     loadingScreen.classList.add('fade-out');
     setTimeout(() => {
       loadingScreen.remove();
+      renderer.domElement.style.visibility = 'visible';
       appReady = true;
     }, 700);
   }, 250);
@@ -1563,7 +1565,7 @@ function startSceneLoad() {
       });
     }
 
-    const bed        = model.getObjectByName('Cube016_1');
+    const bed        = model.getObjectByName('MCBed');
     const pokeball   = model.getObjectByName('Pokeball');
     if (pokeball) registerClickable(pokeball);
     mcbed = bed;

@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>kyle's portfolio</title>
-<link rel="icon" type="image/png" href="/bmoicon2.png">
+<title>BMO OS v1.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;700&family=Silkscreen&family=DM+Mono&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
@@ -63,37 +62,17 @@
   border-radius: 20px;
   overflow: hidden;
   z-index: -1;
-  background: #cefec8;
+  background: #d1ffd3;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  /* Same hide-until-ready treatment as #bg-video — the frame's #cefec8
-     placeholder background would otherwise bleed through the white-flash
-     gradient and read as a slightly-off-color tile during the transition. */
-  opacity: 0;
-
-}
-.bmo-screen-frame.video-ready{
   opacity: 1;
 }
 
-#bg-video {
-  min-width: 100%;
-  min-height: 100%;
-  object-fit: cover;
-
-  transform: scale(1.05);
+#bmoFaceSvg {
   display: block;
-
-  /* Hidden during the eye-adjust intro so the video's green tones don't
-     clash with the white-flash gradient. JS flips .video-ready on once the
-     flash animation ends, and the transition fades it in cleanly. */
-  opacity: 0;
-
-}
-#bg-video.video-ready{
-  opacity: 1;
+  width: 100%;
+  height: 100%;
 }
 
 body {
@@ -386,24 +365,10 @@ body {
     100% { opacity:0;    background:#d1ffd3; }
   }
 
-  /* Body's "exposure adjusting" pass — overblown + softly blurred at first,
-     resolves into the normal, sharp image. */
-  body{
-    animation: screenFocus 1.8s cubic-bezier(.2,.7,.2,1) forwards;
-  }
-  @keyframes screenFocus{
-    0%   { filter: brightness(2.4) saturate(1.4) blur(6px); }
-    20%  { filter: brightness(1.9) saturate(1.3) blur(3.5px); }
-    45%  { filter: brightness(1.4) saturate(1.15) blur(1.5px); }
-    75%  { filter: brightness(1.1) saturate(1.05) blur(0.4px); }
-    100% { filter: brightness(1)   saturate(1)    blur(0); }
-  }
 
   /* Respect users who prefer reduced motion — skip the intro entirely. */
   @media (prefers-reduced-motion: reduce){
     #screenFlash{ animation:none; opacity:0; }
-    body{ animation:none; filter:none; }
-    #bg-video, .bmo-screen-frame{ opacity:1; transition:none; }
   }
 </style>
 </head>
@@ -413,12 +378,21 @@ body {
      after the animation so it can't ever block clicks or burn the GPU. -->
 <div id="screenFlash" aria-hidden="true"></div>
 
-<div class="bmo-screen-frame">
-  <!-- preload="auto" so the first frame is decoded and ready to go the
-       instant we call .play() after the eye-adjust transition. No autoplay. -->
-  <video muted loop playsinline preload="auto" id="bg-video">
-    <source src="bmoblinkingvid.mp4" type="video/mp4">
-  </video>
+<div class="bmo-screen-frame" id="bmoFaceFrame">
+  <svg id="bmoFaceSvg" viewBox="0 0 800 650" xmlns="http://www.w3.org/2000/svg">
+    <!-- Left eye: group lets us translate for mouse tracking independently of ry for blinking -->
+    <g id="leftEyeGroup">
+      <ellipse id="leftEllipse" cx="160" cy="235" rx="18" ry="30" fill="#1a1a1a"/>
+    </g>
+    <!-- Right eye -->
+    <g id="rightEyeGroup">
+      <ellipse id="rightEllipse" cx="640" cy="235" rx="18" ry="30" fill="#1a1a1a"/>
+    </g>
+    <!-- Smile -->
+    <g id="smileGroup">
+      <path d="M 238 345 Q 400 438 562 345" stroke="#1a1a1a" stroke-width="6" fill="none" stroke-linecap="round"/>
+    </g>
+  </svg>
 </div>
 
 <div class="bmo-face-bg"></div>
@@ -459,7 +433,7 @@ body {
       <div class="file-line"></div>
     </div>
   </div>
-  <span class="file-label">portfolio.sh</span>
+  <span class="file-label">portfolio.html</span>
 </div>
 
 <!-- Terminal Window -->
@@ -531,53 +505,121 @@ body {
 
 
 <script>
-// Remove the eye-adjust flash from the DOM once it finishes animating, and
-// start the BMO blinking video at the same moment. Both are tied to the same
-// "screen has finished turning on" event so they stay in sync — the video
-// starts blinking right as your eyes finish adjusting.
+// ── URL cleanup ──────────────────────────────────────────────────────────────
+if (window.location.pathname.endsWith('.html')) {
+  try {
+    const cleanPath = window.location.pathname.replace('bmo_desktop.html', '2d');
+    window.history.replaceState(null, '', cleanPath);
+  } catch(e) { /* file:// protocol blocks replaceState — safe to ignore */ }
+}
 
-// URL bar cleanup is left to Vercel's cleanUrls rule (vercel.json), which
-// 301s /bmo_desktop.html → /bmo_desktop before this script ever runs. In dev
-// and `vite preview` there's no cleanUrls equivalent, so the .html stays in
-// the address bar — that's fine: the path actually serves the file, so
-// reload + share-link both work. The previous rewrite to /2d only changed
-// the address bar; reloading from /2d hit the SPA fallback and showed the
-// 3D title screen instead of the BMO desktop.
-
-(function cleanupFlash(){
+// ── Screen-on flash cleanup + face reveal ────────────────────────────────────
+(function setupFace(){
   const flash = document.getElementById('screenFlash');
-  const bgVideo = document.getElementById('bg-video');
+  const frame = document.getElementById('bmoFaceFrame');
 
-  function startBgVideo(){
-    if (!bgVideo) return;
-    if (bgVideo.dataset.started === '1') return;
-    bgVideo.dataset.started = '1';
-
-    bgVideo.currentTime = 0;
-    const p = bgVideo.play();
-    if (p && typeof p.catch === 'function') {
-      p.catch(err => console.warn('bg-video play failed:', err));
-    }
-  }
-
-  // Remove the flash overlay as soon as it finishes its own animation.
   if (flash) {
     flash.addEventListener('animationend', () => flash.remove(), { once: true });
-    setTimeout(() => flash.remove(), 2200); // hard fallback
+    setTimeout(() => flash.remove(), 2200);
   }
 
-  // Reveal the BMO blinking video AFTER a fixed 4-second wait. By then the
-  // glow transition is fully gone, so the green video tones can't clash with
-  // the white-flash gradient. We also start playback at the same moment so
-  // the video begins from frame 0 the instant it appears.
-  setTimeout(() => {
-    startBgVideo();
-    if (bgVideo) bgVideo.classList.add('video-ready');
-    // Reveal the screen frame too — its #cefec8 placeholder background would
-    // otherwise be visible during the flash and look like a colored tile.
-    const frame = document.querySelector('.bmo-screen-frame');
-    if (frame) frame.classList.add('video-ready');
-  }, 4000);
+})();
+
+// ── BMO eye tracking + blinking ───────────────────────────────────────────────
+(function initFace(){
+  const leftGroup  = document.getElementById('leftEyeGroup');
+  const rightGroup = document.getElementById('rightEyeGroup');
+  const smileGroup = document.getElementById('smileGroup');
+  const leftEl     = document.getElementById('leftEllipse');
+  const rightEl    = document.getElementById('rightEllipse');
+
+  // SVG logical eye centres (matching the viewBox)
+  const LEFT_CX  = 160, LEFT_CY  = 235;
+  const RIGHT_CX = 640, RIGHT_CY = 235;
+  const NORMAL_RY = 30;
+
+  // Smooth-follow state
+  let targetDx = 0, targetDy = 0;
+  let curDx    = 0, curDy    = 0;
+
+  // Blink state
+  let blinking = false;
+
+  // ── Mouse tracking ──────────────────────────────────────────────────────────
+  document.addEventListener('mousemove', function(e){
+    const cx = window.innerWidth  / 2;
+    const cy = window.innerHeight / 2;
+    const nx = (e.clientX - cx) / cx;   // -1 … 1
+    const ny = (e.clientY - cy) / cy;
+    // Subtle: max ±16 px horizontal, ±11 px vertical
+    targetDx = nx * 16;
+    targetDy = ny * 11;
+  });
+
+  // ── Animation loop (smooth lerp) ────────────────────────────────────────────
+  function tick(){
+    curDx += (targetDx - curDx) * 0.07;
+    curDy += (targetDy - curDy) * 0.07;
+
+    // Apply translate to each eye group so blinking (ry change) stays centred
+    leftGroup.setAttribute('transform',
+      `translate(${LEFT_CX + curDx}, ${LEFT_CY + curDy})`);
+    rightGroup.setAttribute('transform',
+      `translate(${RIGHT_CX + curDx}, ${RIGHT_CY + curDy})`);
+
+    // Smile follows at half the displacement for a subtler effect
+    smileGroup.setAttribute('transform',
+      `translate(${curDx * 0.5}, ${curDy * 0.5})`);
+
+    // Pivot the ellipse around its own centre (group already positions it)
+    leftEl.setAttribute('cx',  0); leftEl.setAttribute('cy',  0);
+    rightEl.setAttribute('cx', 0); rightEl.setAttribute('cy', 0);
+
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ── Blinking ────────────────────────────────────────────────────────────────
+  function animateRy(fromRy, toRy, durationMs, onDone){
+    const start = performance.now();
+    function step(now){
+      const t = Math.min((now - start) / durationMs, 1);
+      const ry = fromRy + (toRy - fromRy) * t;
+      leftEl.setAttribute('ry',  ry);
+      rightEl.setAttribute('ry', ry);
+      if (t < 1) requestAnimationFrame(step);
+      else if (onDone) onDone();
+    }
+    requestAnimationFrame(step);
+  }
+
+  function doBlink(){
+    if (blinking) return;
+    blinking = true;
+
+    animateRy(NORMAL_RY, 3, 75, () => {          // close
+      setTimeout(() => {
+        animateRy(3, NORMAL_RY, 110, () => {      // open
+          blinking = false;
+          scheduleNextBlink();
+        });
+      }, 55);                                      // hold closed
+    });
+  }
+
+  function scheduleNextBlink(){
+    // Blink every 2.5 – 5.5 s; occasionally a quick double-blink
+    const delay = 2500 + Math.random() * 3000;
+    setTimeout(() => {
+      doBlink();
+      if (Math.random() < 0.25){                  // 25 % chance of double-blink
+        setTimeout(doBlink, 320);
+      }
+    }, delay);
+  }
+
+  // First blink after 1.8 s (face just appeared)
+  setTimeout(() => { doBlink(); }, 1800);
 })();
 
 function maximizeWindow(name) {
@@ -588,10 +630,6 @@ function maximizeWindow(name) {
 
 
 console.log("Hello");
-
-const bmoOn = new Audio('/bmo-on.wav')
-bmoOn.currentTime = 0;
-bmoOn.play()
 
 // Clock
 function updateClock(){
@@ -616,7 +654,7 @@ const bootLines=[
   ['  [3] minecraft','t-blue'],
   ['  [4] animal crossing','t-yellow'],
   ['',''],
-  ['> scanning done! click portfolio.sh to start!','t-yellow'],
+  ['> bmo is the greatest!','t-yellow'],
 ];
 
 const npmLines=[
@@ -628,11 +666,12 @@ const npmLines=[
   ['',''],
   ['  VITE v5.4.19  ready in 342ms','t-green'],
   ['',''],
-  ['  ➜  Local:   http://localhost:5173/','t-blue'],
-  ['  ➜  Network: use --host to expose/','t-blue-dim'],
+  ['  ➜  Local:   http://localhost:3000/','t-blue'],
+  ['  ➜  Network: http://192.168.1.42:3000/','t-blue-dim'],
   ['  ➜  press h + enter to show help','t-gray'],
   ['',''],
-  ['> 2D portfolio running now!','t-yellow'],
+  ['  ♥ bmo is serving portfolio.html!','t-yellow'],
+  ['  GET /portfolio.html 200 12ms','t-green-dim'],
 ];
 
 const term=document.getElementById('terminal');
@@ -728,6 +767,9 @@ function openBrowser(){
     iframe.style.display='block';
     iframe.onload=()=>iframe.contentWindow.focus();
   },1200);
+
+
+
 }
 
 
