@@ -76,10 +76,7 @@ const focusPresets = {
 const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 3, 10);
 
-// antialias is OFF — EffectComposer renders to its own HalfFloat target and
-// then runs OutputPass for the final blit, so hardware MSAA on the default
-// drawing buffer is never sampled. Leaving it on costs memory + GPU cycles
-// for a buffer nothing reads.
+// antialias is OFF 
 const renderer = new THREE.WebGLRenderer({
   antialias: false,
   powerPreference: 'high-performance',
@@ -459,6 +456,7 @@ function dismissLoadingScreen() {
       loadingScreen.remove();
       renderer.domElement.style.opacity = '1';
       appReady = true;
+      showHelpTooltip();
     }, 700);
   }, 250);
 }
@@ -490,7 +488,7 @@ const helpBtn = document.createElement('button');
 helpBtn.textContent = '?';
 helpBtn.style.cssText = `
   position: fixed;
-  padding-top: 12px;
+  padding-top: 14px;
   bottom: 24px;
   right: 24px;
   width: 40px;
@@ -520,6 +518,50 @@ helpBtn.addEventListener('mouseleave', () => {
   helpBtn.style.borderColor = 'rgba(201,244,223,0.6)';
 });
 document.body.appendChild(helpBtn);
+
+// Tooltip that appears beside the ? button when the scene first loads
+const helpTooltip = document.createElement('div');
+helpTooltip.textContent = 'click an object to focus on it · press esc to reset view';
+helpTooltip.style.cssText = `
+  position: fixed;
+  bottom: 30px;
+  right: 72px;
+  background: rgba(10,21,48,0.75);
+  color: #c9f4df;
+  font-family: 'Minecraftia', 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  line-height: 1.5;
+  padding: 11px 14px 5px;
+  border-radius: 8px;
+  border: 2px solid rgba(201,244,223,1);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  white-space: nowrap;
+`;
+// small arrow pointing right toward the ? button
+helpTooltip.innerHTML += `<span style="
+  position:absolute;right:-7px;top:50%;transform:translateY(-50%);
+  width:0;height:0;
+  border-top:6px solid transparent;
+  border-bottom:6px solid transparent;
+  border-left:7px solid rgba(10,21,48,0.75);
+"></span>`;
+document.body.appendChild(helpTooltip);
+
+function showHelpTooltip() {
+  helpTooltip.style.opacity = '1';
+  helpTooltip.style.transform = 'translateX(0)';
+  setTimeout(() => {
+    helpTooltip.style.opacity = '0';
+    helpTooltip.style.transform = 'translateX(20px)';
+  }, 4000);
+}
 
 const helpOverlay = document.createElement('div');
 helpOverlay.style.cssText = `
