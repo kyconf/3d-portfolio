@@ -962,7 +962,7 @@ const DAY_PALETTE = {
 const paperMaterial = new THREE.ShaderMaterial({
   uniforms: {
     uTime: { value: 0 },
-    uSpeed: { value: 10.0 },
+    uSpeed: { value: 8.5 },
     uStrength: { value: 0.11 },
   },
   vertexShader: /* glsl */`
@@ -992,9 +992,11 @@ const paperMaterial = new THREE.ShaderMaterial({
   side: THREE.DoubleSide
 });
 
-const paperGeo = new THREE.PlaneGeometry(0.05, 0.3, 1, 15);
+const paperGeo = new THREE.PlaneGeometry(0.05, 0.3, 1, 15); 
 const paperMesh = new THREE.Mesh(paperGeo, paperMaterial);
-paperMesh.position.set(0.5, 1.2, -1.8);
+paperMesh.position.set(0.5, 3.75, -1.8); // center of scene at eye level
+paperMesh.frustumCulled = false;
+paperMesh.visible = true;
 scene.add(paperMesh);
 
 

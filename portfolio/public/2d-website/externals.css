@@ -524,9 +524,8 @@ background-color: white;
 
 
 .profile-card .avatar-img {
-    width: 240px;
+    width: 100%;
     height: auto;
-    image-rendering: pixelated;
 }
 
 .profile-info {
@@ -792,7 +791,7 @@ background-color: white;
         flex-shrink: 0;
     }
     .profile-card .avatar-img {
-        width: 190px;
+        width: 100%;
     }
     .project-title {
         font-size: 1.1rem;
