@@ -319,6 +319,31 @@ body {
     padding:3px 10px;font-size:7px;border-radius:2px;
     color:var(--bmo-white);cursor:pointer;
   }
+  /* === Mini-player === */
+  .mini-player{
+    position:absolute;bottom:44px;right:10px;
+    background:var(--bmo-screen);
+    border:2px solid var(--bmo-teal);
+    border-radius:4px;
+    padding:6px 10px;
+    display:flex;align-items:center;gap:8px;
+    z-index:9;font-family:'Silkscreen',monospace;
+    box-shadow:0 0 8px rgba(0,0,0,0.4);
+  }
+  .mini-player-note{
+    font-size:11px;color:var(--bmo-green-dark);
+    animation:noteFloat 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes noteFloat{from{opacity:0.5;transform:translateY(0)}to{opacity:1;transform:translateY(-2px)}}
+  .mini-player-label{font-size:7px;color:var(--bmo-gray-light);letter-spacing:1px;margin-bottom:1px;}
+  .mini-player-title{font-size:8px;color:var(--bmo-white);letter-spacing:0.5px;white-space:nowrap;}
+  .mini-player-btn{
+    background:none;border:1px solid var(--bmo-teal);border-radius:2px;
+    color:var(--bmo-green-dark);font-size:9px;cursor:pointer;padding:1px 5px;
+    font-family:'Silkscreen',monospace;transition:background 0.1s;
+  }
+  .mini-player-btn:hover{background:var(--bmo-teal);}
+
   .clock{
     margin-left:auto;font-family:'DM Mono',monospace;
     font-size:10px;color:var(--bmo-yellow);
@@ -496,13 +521,22 @@ body {
 
 <div class="version">BMO OS v2.0</div>
 
+<!-- Mini-player -->
+<div class="mini-player" id="miniPlayer">
+  <span class="mini-player-note">♪</span>
+  <div>
+    <div class="mini-player-label">now playing</div>
+    <div class="mini-player-title">Hotel (UNDERTALE Soundtrack) — Toby Fox</div>
+  </div>
+  <button class="mini-player-btn" id="musicToggle">II</button>
+</div>
+
 <!-- Taskbar -->
 <div class="taskbar">
   <button class="start-btn">♥ BMO</button>
   <div class="task-item" id="taskTerminal" onclick="toggleWindow('terminal')">terminal</div>
   <div class="task-item task-hidden" id="taskBrowser" onclick="toggleWindow('browser')">browser</div>
-  <!-- Back to the 3D scene. Plain anchor so the browser handles it naturally
-       (history works, middle-click works, no JS required). -->
+
   <a class="task-item" id="backTo3D" href="/" style="text-decoration:none;">← 3d room</a>
   <div class="clock" id="clock">00:00</div>
 </div>
@@ -510,7 +544,7 @@ body {
 
 
 <script>
-// ── URL cleanup ──────────────────────────────────────────────────────────────
+
 if (window.location.pathname.endsWith('.html')) {
   try {
     const cleanPath = window.location.pathname.replace('bmo_desktop.html', '2d');
@@ -797,6 +831,30 @@ function toggleWindow(name){
     document.getElementById('browserWindow').classList.toggle('win-hidden');
   }
 }
+
+const bmoBoot = new Audio('bmo-on.wav');
+const hotelMusic = new Audio('hotel.wav');
+hotelMusic.loop = true;
+hotelMusic.volume = 0.3;
+window.addEventListener('load', () => {
+  bmoBoot.play().catch(() => {});
+  bmoBoot.addEventListener('ended', () => {
+    setTimeout(() => { hotelMusic.play().catch(() => {}); }, 200);
+  }, { once: true });
+});
+document.getElementById('musicToggle').addEventListener('click', () => {
+  const btn = document.getElementById('musicToggle');
+  const note = document.querySelector('.mini-player-note');
+  if (hotelMusic.paused) {
+    hotelMusic.play().catch(() => {});
+    btn.textContent = 'II';
+    note.style.animationPlayState = 'running';
+  } else {
+    hotelMusic.pause();
+    btn.textContent = '▶';
+    note.style.animationPlayState = 'paused';
+  }
+});
 
 // Football pixel art
 const fc=document.getElementById('footballCanvas');

@@ -36,7 +36,7 @@
 
             <!-- Left: profile card -->
             <div class="profile-card pixel-box">
-                <div class="pixel-art-placeholder" style="position:relative;">
+                <div class="pixel-art-placeholder" style="position:relative;overflow:hidden;margin-bottom:-10px;">
                     <!-- HD photo underneath -->
                     <img src="profile1.jpg" alt="Profile Photo" class="avatar-img avatar-hd">
                     <!-- Pixel art on top, fades out after load -->
@@ -205,13 +205,14 @@
 .avatar-hd {
     display: block;
     width: 100%;
+    margin-top: -40px;
 }
 
 /* Pixel art overlays on top */
 .avatar-pixel {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: -40px; left: 0;
+    width: 100%; height: calc(100% + 40px);
     object-fit: cover;
     image-rendering: pixelated;
     opacity: 1;
