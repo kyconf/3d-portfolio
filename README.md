@@ -44,3 +44,7 @@ May work differently depending on the browser, operating system, and or specific
 ## credits
 Some assets were taken directly from Sketchfab. Attributed under CC. Most of the assets and models were created by me personally in Blender. 
 
+Miscellaneous
+Desktop Music: Hotel (Undertale OST) - Toby Fox 
+BMO "Who wants to play video-games?" - Cartoon Network
+
