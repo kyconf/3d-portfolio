@@ -688,6 +688,22 @@ background-color: white;
 
 }
 
+/* About page cards: gray border (matching contact cards) + project-style hover lift */
+.profile-card,
+.bio-box,
+.quest-box {
+    border-color: var(--white);
+    transition: transform 0.1s ease-out, border-color 0.15s, background 0.15s;
+}
+
+.profile-card:hover,
+.bio-box:hover,
+.quest-box:hover {
+    transform: translateY(-4px);
+    border-color: var(--green);
+    background: rgba(74, 222, 128, 0.06);
+}
+
 
 
 .avatar-box {
