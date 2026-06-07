@@ -500,7 +500,7 @@ body {
       <div class="nav-btn">⟳</div>
     </div>
     <div class="url-box">
-      <span class="lock">🔒</span>
+      <span class="lock"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock-keyhole-icon lucide-lock-keyhole"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg> </span>
       <span class="url-text"><b>localhost:5173</b>/portfolio</span>
     </div>
   </div>
@@ -526,16 +526,16 @@ body {
   <span class="mini-player-note">♪</span>
   <div>
     <div class="mini-player-label">now playing</div>
-    <div class="mini-player-title">Hotel (UNDERTALE Soundtrack) — Toby Fox</div>
+    <div class="mini-player-title">Hotel (UNDERTALE OST) — Toby Fox</div>
   </div>
-  <button class="mini-player-btn" id="musicToggle">II</button>
+  <button class="mini-player-btn" id="musicToggle">II </button>
 </div>
 
 <!-- Taskbar -->
 <div class="taskbar">
-  <button class="start-btn">♥ BMO</button>
-  <div class="task-item" id="taskTerminal" onclick="toggleWindow('terminal')">terminal</div>
-  <div class="task-item task-hidden" id="taskBrowser" onclick="toggleWindow('browser')">browser</div>
+  <button class="start-btn">⌤ BMO</button>
+  <div class="task-item" id="taskTerminal" onclick="toggleWindow('terminal')">⌘ terminal</div>
+  <div class="task-item task-hidden" id="taskBrowser" onclick="toggleWindow('browser')">⊛ browser</div>
 
   <a class="task-item" id="backTo3D" href="/" style="text-decoration:none;">← 3d room</a>
   <div class="clock" id="clock">00:00</div>
@@ -545,12 +545,12 @@ body {
 
 <script>
 
-if (window.location.pathname.endsWith('.html')) {
-  try {
-    const cleanPath = window.location.pathname.replace('bmo_desktop.html', '2d');
-    window.history.replaceState(null, '', cleanPath);
-  } catch(e) { /* file:// protocol blocks replaceState — safe to ignore */ }
-}
+// if (window.location.pathname.endsWith('.html')) {
+//   try {
+//     const cleanPath = window.location.pathname.replace('bmo_desktop.html', '2d');
+//     window.history.replaceState(null, '', cleanPath);
+//   } catch(e) { /* file:// protocol blocks replaceState — safe to ignore */ }
+// }
 
 // ── Screen-on flash cleanup + face reveal ────────────────────────────────────
 (function setupFace(){
@@ -709,7 +709,7 @@ const npmLines=[
   ['  ➜  Network: use --host to expose','t-blue-dim'],
   ['  ➜  press h + enter to show help','t-gray'],
   ['',''],
-  ['  2D portfolio is live!','t-yellow'],
+  ['------------- 2D portfolio is live! -----------------','t-yellow'],
 
 ];
 
