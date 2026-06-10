@@ -1338,6 +1338,30 @@ background-color: white;
 #contact .contact-icon { font-size: 13px; }
 #contact .contact-label { font-size: 7px; }
 
+.has-preview {
+    position: relative;
+    overflow: hidden;
+}
+
+.card-preview-overlay {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    background: #000;
+}
+
+.has-preview:hover .card-preview-overlay {
+    opacity: 1;
+}
+
+.card-preview-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .resume-btn {
     display: block;
     margin-top: 1rem;
