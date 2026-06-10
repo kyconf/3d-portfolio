@@ -1337,4 +1337,21 @@ background-color: white;
 
 #contact .contact-icon { font-size: 13px; }
 #contact .contact-label { font-size: 7px; }
+
+.github-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+}
+
+.github-btn:hover {
+    background: var(--green);
+    color: #0a1530;
+}
+
+.github-btn:hover svg {
+    fill: #0a1530;
+}
 #contact .contact-value { font-size: 9px; }

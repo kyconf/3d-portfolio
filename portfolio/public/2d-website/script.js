@@ -10,18 +10,21 @@ const projects = [
     desc: "A real-time computer vision application that utilizes OpenCV and Python to detect and translate American Sign Language gestures into text.",
     tech: ["python", "flask", "opencv"],
     color: "bg-secondary",
+    github: "https://github.com/EthanConstantin/SLInterpreter",
   },
   {
     title: "3-D PORTFOLIO",
     desc: "A 3D interactive scene of my 'ideal room' built with Three.js and Vite. Combines both 3D Blender scenes with 2D static websites.",
     tech: ["blender", "html/css/js", "three.js", "Vite"],
     color: "bg-accent",
+    github: "https://github.com/kyconf/3d-portfolio",
   },
   {
     title: "yorku event hub",
     desc: "Centralized platform for York University students to discover and promote campus events by aggregating data from student clubs, Discord, and Instagram into a unified calendar for students to view. ",
     tech: ["nextjs", "python + fastapi", "postgresql", "supabase"],
     color: "bg-destructive",
+    github: "https://github.com/kyconf/project-yuevents",
   },
     {
     title: "beyond education sat simulator",
@@ -34,6 +37,7 @@ const projects = [
     desc: "An AI-driven exam automation tool created to reduce test preparation time. Utilizes a React front-end and Node.js backend to extract, transcribe, and parse text and images from PDF into Google Sheets. Implements a fine-tuned FLAN-T5 model in Python to classify complex multi-input questions by difficulty, passage type, and format. Uses the OpenAI API to generate / regenerate new questions & scan images.",
     tech: ["react", "node.js", "python", "sheets api", "drive api"],
     color: "bg-purple",
+    github: "https://github.com/kyconf/ml-automation-classifier-transcriber",
     }
 
 ];
@@ -51,6 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <p class="project-desc">${p.desc}</p>
             <div class="tag-container">
                 ${p.tech.map(t => `<span class="tag">${t}</span>`).join('')}
+                ${p.github ? `<a href="${p.github}" target="_blank" rel="noopener noreferrer" class="tag github-btn" title="View on GitHub"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg></a>` : ''}
             </div>
         </div>
     `).join('');
