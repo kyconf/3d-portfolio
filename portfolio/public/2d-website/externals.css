@@ -1338,6 +1338,25 @@ background-color: white;
 #contact .contact-icon { font-size: 13px; }
 #contact .contact-label { font-size: 7px; }
 
+.resume-btn {
+    display: block;
+    margin-top: 1rem;
+    padding: 5px 15px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: #ccc;
+    background: var(--green-dim);
+    border: 1px solid var(--green);
+    text-decoration: none;
+    text-align: center;
+    transition: background 0.15s, color 0.15s;
+}
+
+.resume-btn:hover {
+    background: var(--green);
+    color: #0a1530;
+}
+
 .github-btn {
     display: inline-flex;
     align-items: center;

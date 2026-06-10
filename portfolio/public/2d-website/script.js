@@ -4,6 +4,7 @@ const projects = [
     desc: "A real-life 3D-printed BMO assembled using a Raspberry Pi and other hardware components. Can execute a number of voice-enabled commands via a pattern recognition model. Commands include getting the weather, estimated bus arrival times, and work schedules for the week.",
     tech: ["Python", "piper-tts", "vosk", "weather-api", "ttc-bus-api", "google-calendar-api"],
     color: "bg-primary",
+    github: "https://github.com/kyconf/bmo-os-mini",
   },
   {
     title: "asl sign language interpreter",
