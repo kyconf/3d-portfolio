@@ -44,30 +44,39 @@ const projects = [
 
 ];
 
+// Build the GitHub icon SVG once so we can reuse it on cards + detail page
+const githubSVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>`;
+
 document.addEventListener("DOMContentLoaded", () => {
     const navItems = document.querySelectorAll(".nav-item");
     const sections = document.querySelectorAll(".page-section");
     const projectsGrid = document.getElementById("projects-grid");
 
     // 1. Generate the Project Cards
-    projectsGrid.innerHTML = projects.map(p => `
-        <div class="pixel-box pixel-card animate-fade-in-up${p.preview ? ' has-preview' : ''}">
+    projectsGrid.innerHTML = projects.map((p, i) => `
+        <div class="pixel-box pixel-card animate-fade-in-up" data-index="${i}" role="button" tabindex="0" aria-label="Open ${p.title}">
             <div class="color-strip ${p.color}"></div>
             <h3 class="project-title">${p.title}</h3>
             <p class="project-desc">${p.desc}</p>
             <div class="tag-container">
                 ${p.tech.map(t => `<span class="tag">${t}</span>`).join('')}
-                ${p.github ? `<a href="${p.github}" target="_blank" rel="noopener noreferrer" class="tag github-btn" title="View on GitHub"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg></a>` : ''}
+                ${p.github ? `<a href="${p.github}" target="_blank" rel="noopener noreferrer" class="tag github-btn" title="View on GitHub">${githubSVG}</a>` : ''}
             </div>
-            ${p.preview ? `<div class="card-preview-overlay"><video class="card-preview-video" src="${p.preview}" muted loop playsinline preload="none"></video></div>` : ''}
+            <span class="card-open-hint">[ VIEW ▸ ]</span>
         </div>
     `).join('');
 
-    // Video preview hover logic
-    projectsGrid.querySelectorAll('.has-preview').forEach(card => {
-        const video = card.querySelector('.card-preview-video');
-        card.addEventListener('mouseenter', () => { video.play(); });
-        card.addEventListener('mouseleave', () => { video.pause(); video.currentTime = 0; });
+    // Click / keyboard → open the dedicated project page
+    projectsGrid.querySelectorAll('.pixel-card').forEach(card => {
+        const open = () => openProjectDetail(parseInt(card.dataset.index, 10));
+        card.addEventListener('click', (e) => {
+            // Don't hijack clicks on the GitHub link inside the card
+            if (e.target.closest('a')) return;
+            open();
+        });
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        });
     });
 
     // 2. Navigation Logic
@@ -80,12 +89,15 @@ document.addEventListener("DOMContentLoaded", () => {
             navItems.forEach(nav => nav.classList.remove("active"));
             item.classList.add("active");
 
+            // Leaving the projects tab? reset back to the grid view
+            if (targetId !== "projects") closeProjectDetail();
+
             // Hide all sections and show target
             sections.forEach(section => {
                 section.style.display = section.id === targetId ? "block" : "none";
 
-            
-            
+
+
             });
 
             if (targetId === "skills") {
@@ -98,6 +110,99 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 });
+
+/* =========================================================
+   PROJECT DETAIL "PAGE"
+   A full-screen retro app-window overlay that slides in over
+   the projects grid when a card is clicked. Acts like its own
+   page (with a BACK button) without needing real routing.
+   ========================================================= */
+function getDetailEl() {
+    let el = document.getElementById("project-detail");
+    if (!el) {
+        const projectsSection = document.getElementById("projects");
+        el = document.createElement("div");
+        el.id = "project-detail";
+        el.className = "project-detail";
+        projectsSection.appendChild(el);
+    }
+    return el;
+}
+
+function openProjectDetail(index) {
+    const p = projects[index];
+    if (!p) return;
+
+    const grid = document.getElementById("projects-grid");
+    const sectionTitle = document.querySelector("#projects .section-title");
+    const detail = getDetailEl();
+
+    detail.innerHTML = `
+        <button class="pd-back" type="button">[ ◂ BACK TO PROJECTS ]</button>
+        <div class="pd-window pixel-box">
+            <div class="pd-body">
+                <div class="pd-media">
+                    ${p.preview
+                        ? `<video class="pd-video" src="${p.preview}" autoplay muted loop playsinline controls></video>`
+                        : `<div class="pd-novideo">// NO PREVIEW AVAILABLE</div>`}
+                </div>
+                <div class="pd-info">
+                    <h2 class="pd-title">${p.title}</h2>
+                    <div class="pd-status"><span class="pd-status-dot"></span> BUILD ONLINE</div>
+                    <p class="pd-desc">${p.desc}</p>
+                    <div class="pd-section-label">// TECH STACK</div>
+                    <div class="tag-container">
+                        ${p.tech.map(t => `<span class="tag">${t}</span>`).join('')}
+                    </div>
+                    <div class="pd-links">
+                        ${p.github
+                            ? `<a href="${p.github}" target="_blank" rel="noopener noreferrer" class="pd-link">${githubSVG}<span>VIEW SOURCE</span></a>`
+                            : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    detail.querySelector(".pd-back").addEventListener("click", closeProjectDetail);
+
+    // Swap views
+    if (sectionTitle) sectionTitle.style.display = "none";
+    grid.style.display = "none";
+    detail.classList.add("open");
+
+    // Reset scroll so the page starts at the top of the detail view
+    const scroller = document.querySelector(".content-section");
+    if (scroller) scroller.scrollTop = 0;
+
+    // Close on Escape
+    document.addEventListener("keydown", escClose);
+}
+
+function closeProjectDetail() {
+    const detail = document.getElementById("project-detail");
+    if (!detail || !detail.classList.contains("open")) return;
+
+    const grid = document.getElementById("projects-grid");
+    const sectionTitle = document.querySelector("#projects .section-title");
+
+    const vid = detail.querySelector(".pd-video");
+    if (vid) vid.pause();
+
+    detail.classList.remove("open");
+    detail.innerHTML = "";
+    if (grid) grid.style.display = "";
+    if (sectionTitle) sectionTitle.style.display = "";
+    document.removeEventListener("keydown", escClose);
+}
+
+function escClose(e) {
+    if (e.key === "Escape") closeProjectDetail();
+}
+
+function slug(str) {
+    return str.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
 
 const skillCategories = [
     {
