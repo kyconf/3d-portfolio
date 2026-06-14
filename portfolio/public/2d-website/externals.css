@@ -682,17 +682,16 @@ background-color: white;
 
 
 .pixel-box {
-    border: 2px solid var(--white);
+    border: 2px solid var(--gray);
     background: #1a1a1a;
     padding: 20px;
 
 }
 
-/* About page cards: gray border (matching contact cards) + project-style hover lift */
+/* About page cards hover lift */
 .profile-card,
 .bio-box,
 .quest-box {
-    border-color: var(--white);
     transition: transform 0.1s ease-out, border-color 0.15s, background 0.15s;
 }
 
@@ -937,7 +936,7 @@ background-color: white;
 /* projects card */
 .pixel-card {
     background: #1a1a1a;
-    border: 2px solid #dddddd;
+    border: 2px solid var(--gray);
     padding: 1rem;
     display: flex;
     flex-direction: column;
@@ -1454,7 +1453,7 @@ background-color: white;
 
 /* The window frame */
 .pd-window {
-    border: 2px solid var(--white);
+    border: 2px solid var(--gray);
     padding: 0;
     overflow: hidden;
 }
