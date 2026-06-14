@@ -36,7 +36,7 @@ const projects = [
     },
     {
     title: "ml-automation-classifier & transcriber",
-    desc: "An AI-driven exam automation tool created to reduce test preparation time. Utilizes a React front-end and Node.js backend to extract, transcribe, and parse text and images from PDF into Google Sheets. Implements a fine-tuned FLAN-T5 model in Python to classify complex multi-input questions by difficulty, passage type, and format. Uses the OpenAI API to generate / regenerate new questions & scan images.",
+    desc: "An AI-driven exam automation tool created to reduce test preparation time. Utilizes a React front-end and Node.js backend to extract, transcribe, and parse text and images from PDF into Google Sheets. Implements a fine-tuned FLAN-T5 model in Python to classify complex multi-input questions by difficulty, passage type, and format.",
     tech: ["react", "node.js", "python", "sheets api", "drive api"],
     color: "bg-purple",
     github: "https://github.com/kyconf/ml-automation-classifier-transcriber",
