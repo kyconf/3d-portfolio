@@ -9,7 +9,7 @@ An immersive, interactive 3D portfolio website that projects a digital represent
 
 To start, simply press BMO's screen to be sent into the virtual 2D portfolio (or go straight there via the 'Choose your Experience' screen).
 
-May work differently depending on the browser, operating system, and or specifications of your computer.
+May work differently depending on the browser, operating system, and or specifications of your computer. 
 
 
 ---
@@ -43,6 +43,7 @@ May work differently depending on the browser, operating system, and or specific
 
 ## credits
 Some assets were taken directly from Sketchfab. Attributed under CC. Most of the assets and models were created by me personally in Blender. 
+*NOTE: If it freezes as you click on BMO, do a quick refresh. It should fix itself, some browsers have issues with this!
 
 
 Miscellaneous:
