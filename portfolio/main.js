@@ -1123,6 +1123,7 @@ let isEscapeAnimating = false;
 let lastEscapeTime = 0;
 let isFocusingObject = false;
 let lastFocusTime = 0;
+let focusAnimStartTime = 0;
 
 const focusCameraPosition = new THREE.Vector3();
 const focusControlsTarget = new THREE.Vector3();
@@ -2142,6 +2143,7 @@ function focusOnObject(object) {
 
   isFocusingObject = true;
   lastFocusTime = performance.now();
+  focusAnimStartTime = performance.now();
   controls.enabled = false;
 }
 
@@ -2149,7 +2151,7 @@ function animateObjectFocus() {
   if (!isFocusingObject) return;
 
   const now = performance.now();
-  const delta = (now - lastFocusTime) / 1000;
+  const delta = Math.min((now - lastFocusTime) / 1000, 0.1); // clamp delta to avoid huge jumps
   lastFocusTime = now;
   const smoothness = 5;
 
@@ -2165,8 +2167,9 @@ function animateObjectFocus() {
 
   const cameraDone = camera.position.distanceTo(focusCameraPosition) < 0.01;
   const targetDone = controls.target.distanceTo(focusControlsTarget) < 0.01;
+  const timedOut = (now - focusAnimStartTime) > 3000; // force-complete after 3s
 
-  if (cameraDone && targetDone) {
+  if ((cameraDone && targetDone) || timedOut) {
     camera.position.copy(focusCameraPosition);
     controls.target.copy(focusControlsTarget);
     camera.lookAt(controls.target);
@@ -2311,6 +2314,7 @@ function zoomToScreenThenShowStatic() {
 
   isFocusingObject = true;
   lastFocusTime = performance.now();
+  focusAnimStartTime = performance.now();
   controls.enabled = false;
 
   onFocusComplete = () => { showStaticScreen(); };

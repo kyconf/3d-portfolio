@@ -40,6 +40,13 @@ const projects = [
     tech: ["react", "node.js", "python", "sheets api", "drive api"],
     color: "bg-purple",
     github: "https://github.com/kyconf/ml-automation-classifier-transcriber",
+    },
+    {
+    title: "automated vulnerability assessment & pen testing",
+    desc: "A vulnerability scanning pipeline using Nmap's Vulners engine, cross-referencing CVEs against NVD/CIRCL APIs for CVSS scores and remediation data. Automates penetration testing by querying msfconsole for each CVE and executing matching Metasploit modules against a homelab to validate exploitability. Generates PDF risk-assessment reports with risk-distribution summaries, top-5 critical CVE vector analysis, and a full CVSS-sorted vulnerability table with remediation guidance.",
+    tech: ["python", "nmap", "metasploit", "nvd api", "circl api", "reportlab"],
+    color: "bg-primary",
+    github: "https://github.com/kyconf/cve-risk-report",
     }
 
 ];
