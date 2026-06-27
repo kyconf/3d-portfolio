@@ -802,7 +802,7 @@ function openBrowser(){
   setTimeout(()=>{
     document.getElementById('browserLoading').style.display='none';
     const iframe=document.getElementById('browserIframe');
-    iframe.src='/2d-website/front.html';
+    iframe.src='/2d-website/';
     iframe.style.display='block';
     iframe.onload=()=>iframe.contentWindow.focus();
   },1200);

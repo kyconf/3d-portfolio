@@ -4,8 +4,34 @@
 // them in parallel.
 
 import { defineConfig } from 'vite';
+import fs from 'fs';
+import path from 'path';
 
 export default defineConfig({
+  plugins: [
+    {
+      name: 'serve-static-subdir-index',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          // Serve index.html for /2d-website and /2d-website/ in dev mode,
+          // matching what Vercel does in production with directory indexes.
+          if (req.url === '/2d-website' || req.url === '/2d-website/') {
+            const filePath = path.resolve(__dirname, 'public/2d-website/index.html');
+            res.setHeader('Content-Type', 'text/html');
+            res.end(fs.readFileSync(filePath, 'utf-8'));
+            return;
+          }
+          if (req.url === '/bmo_desktop' || req.url === '/bmo_desktop/') {
+            const filePath = path.resolve(__dirname, 'public/bmo_desktop.html');
+            res.setHeader('Content-Type', 'text/html');
+            res.end(fs.readFileSync(filePath, 'utf-8'));
+            return;
+          }
+          next();
+        });
+      }
+    }
+  ],
   build: {
     // Modern browsers only — smaller output, no legacy transpile bloat.
     target: 'esnext',

@@ -95,6 +95,6 @@ document.addEventListener('keydown', (event) => {
     console.log('Booting PXOS...');
     
     // Redirect to your main portfolio page
-    window.location.href = 'front.html'; 
+    window.location.href = '/2d-website/';
   }
 });

@@ -437,7 +437,7 @@ pick2dBtn.addEventListener('click', () => {
   sessionStorage.setItem('reload3DOnReturn', '1');
   pickerOverlay.style.opacity = '0';
   setTimeout(() => {
-    window.location.href = '/2d-website/front.html';
+    window.location.href = '/2d-website/';
   }, 350);
 });
 
@@ -2296,7 +2296,7 @@ function showStaticScreen() {
 
 
   setTimeout(() => {
-    window.location.href = '/bmo_desktop.html';
+    window.location.href = '/bmo_desktop';
   }, 260);
 }
 
