@@ -199,7 +199,7 @@ titleScreen.id = 'titleScreen';
 titleScreen.innerHTML = `
   <div class="title-content">
     <div class="title-text">kyle fernandez</div>
-    <div class="title-subtitle">software engineer</div>
+    <div class="title-subtitle">software engineer | data & security analyst</div>
     <div class="title-hint">[ click anywhere to begin  ]</div>
   </div>
 `;
