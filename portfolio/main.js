@@ -1381,7 +1381,7 @@ loader.setDRACOLoader(dracoLoader);
 
 function startSceneLoad() {
   loader.load(
-  '/backupisometricScene.glb',
+  '/scene-1k.glb',
   (gltf) => {
     const model = gltf.scene;
     model.traverse((object) => {
