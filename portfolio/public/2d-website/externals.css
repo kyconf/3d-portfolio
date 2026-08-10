@@ -1362,6 +1362,43 @@ background-color: white;
     color: #0a1530;
 }
 
+.paper-box {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.paper-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 9px;
+    color: var(--green);
+    text-transform: uppercase;
+}
+
+.paper-title {
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.paper-abstract {
+    font-size: 10px;
+    line-height: 1.6;
+    color: #aaa;
+    margin-bottom: 12px;
+}
+
+.paper-link.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: default;
+    display: inline-block;
+    width: auto;
+    padding: 5px 20px;
+}
+
 .github-btn {
     display: inline-flex;
     align-items: center;
