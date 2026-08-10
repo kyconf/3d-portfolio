@@ -11,8 +11,25 @@
 <body>
 
 <div class="titleName">
- <h1 id="myName"> KYLE_FERNANDEZ </h1>
+ <h1 id="myName" role="button" tabindex="0" aria-label="Return to the main portfolio" title="back to start"> KYLE_FERNANDEZ </h1>
  <h2 id="desc" class="typography3"> full stack developer </h2>
+</div>
+
+<!-- Leave-site confirmation -->
+<div class="confirm-overlay" id="homeConfirm" hidden>
+  <div class="confirm-box pixel-box" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmBody">
+    <div class="color-strip bg-primary"></div>
+    <h3 class="confirm-title" id="confirmTitle">// LEAVE THE 2D SITE?</h3>
+    <p class="confirm-body" id="confirmBody">
+      This will send you back to the start screen, where you can load the
+      full 3D room or come back here.
+    </p>
+    <p class="confirm-note">// the 3D room is graphics-heavy and takes a moment to load</p>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-btn confirm-yes" id="homeConfirmYes">[ TAKE ME THERE ]</button>
+      <button type="button" class="confirm-btn confirm-no" id="homeConfirmNo">[ STAY HERE ]</button>
+    </div>
+  </div>
 </div>
 
 
@@ -61,7 +78,8 @@
 
             <div class="about-right">
                 <div class="pixel-box bio-box">
-                    <p><strong>Hey! I'm Kyle </strong>— a full stack developer who likes to dabble in a lot of things cool. Engineering, 3D modeling, games, cybersecurity — if it's interesting, I'm probably exploring it. Ask me anything, from anything to why I do what I do!</p>
+                    <p class="bio-greeting">Hey! I'm Kyle</p>
+                    <p class="bio-text">A full stack developer who likes to dabble in a lot of things cool. Engineering, 3D modeling, games, cybersecurity — if it's interesting, I'm probably exploring it. Ask me anything, from anything to why I do what I do!</p>
                     <br>
                     
                     <p><i>"When you're curious, you find plenty of interesting things to do." -Walt Disney</i></p>
@@ -113,16 +131,27 @@
     <div id="research" class="page-section" style="display: none;">
         <h2 class="section-title"><span class="animarrow">> </span> RESEARCH</h2>
         <div class="pixel-box paper-box">
-            <div class="paper-status">
-                <span class="status-dot"></span>
-                <span class="status-text">coming soon</span>
-            </div>
-            <p class="paper-title">[ PAPER TITLE TBD ]</p>
-            <p class="paper-abstract">Abstract / summary placeholder — details will be added here once the paper is published.</p>
+            <div class="color-strip bg-primary"></div>
+            <p class="paper-title">Utilization of Philippine Mahogany (Toona calantas) and Gmelina (Gmelina arborea) as Novel Amalgamate Plywood</p>
+            <p class="paper-authors">
+                <span class="paper-author-me">Kyle Colin N. Fernandez</span>, Matthew N. Dalman, Sergio Ruben V. Joya,
+                Romina Franzia Guinevere S. Sapitula, Julia Pauline S. Siton, Jaime Engracio R. Ang,
+                Alexander Daniel C. Del Rosario, Jarylle Kiana Marie Y. Tavera
+            </p>
+            <p class="paper-venue">De La Salle Santiago Zobel School, Vermosa Campus — Imus City</p>
             <div class="tag-container">
-                <span class="tag">research</span>
+                <span class="tag">philippine mahogany</span>
+                <span class="tag">gmelina arborea</span>
+                <span class="tag">amalgamate plywood</span>
+                <span class="tag">bending strength</span>
+                <span class="tag">shear bond strength</span>
             </div>
-            <a href="#" class="resume-btn paper-link disabled" aria-disabled="true"> VIEW PAPER</a>
+            <div class="paper-links">
+                <a href="https://www.researchgate.net/publication/408150505_Utilization_of_Philippine_Mahogany_Toona_calantas_and_Gmelina_Gmelina_arborea_as_Novel_Amalgamate_Plywood"
+                   class="resume-btn paper-link" target="_blank" rel="noopener noreferrer">VIEW PAPER</a>
+                <a href="https://scholar.google.ca/citations?user=P8LEbqUAAAAJ&amp;hl=en"
+                   class="resume-btn paper-link" target="_blank" rel="noopener noreferrer">GOOGLE SCHOLAR</a>
+            </div>
         </div>
     </div>
 

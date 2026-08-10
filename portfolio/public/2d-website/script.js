@@ -349,3 +349,47 @@ function hideScrollHint() {
     const hint = document.getElementById('skills-scroll-hint');
     if (hint) { hint.classList.remove('visible'); hint.classList.add('hidden'); }
 }
+/* === "KYLE_FERNANDEZ" → back to the start screen (with confirmation) === */
+(function setupHomeConfirm() {
+    const nameEl  = document.getElementById('myName');
+    const overlay = document.getElementById('homeConfirm');
+    const yesBtn  = document.getElementById('homeConfirmYes');
+    const noBtn   = document.getElementById('homeConfirmNo');
+    if (!nameEl || !overlay || !yesBtn || !noBtn) return;
+
+    let lastFocused = null;
+
+    const open = () => {
+        lastFocused = document.activeElement;
+        overlay.hidden = false;
+        yesBtn.focus();
+    };
+
+    const close = () => {
+        overlay.hidden = true;
+        if (lastFocused && lastFocused.focus) lastFocused.focus();
+    };
+
+    nameEl.addEventListener('click', open);
+    nameEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+
+    yesBtn.addEventListener('click', () => {
+        // main.js sets this when it hands off to the 2D site; clear it so the
+        // start screen shows the picker instead of bouncing straight back.
+        try { sessionStorage.removeItem('reload3DOnReturn'); } catch (_) {}
+        window.location.href = '/';
+    });
+
+    noBtn.addEventListener('click', close);
+
+    // Click the backdrop (but not the box) to dismiss
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) close();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !overlay.hidden) close();
+    });
+})();

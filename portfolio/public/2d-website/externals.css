@@ -379,8 +379,18 @@
 
   #myName {
     font-size: 4vh;
- 
+    cursor: pointer;
+    display: inline-block;
+    transition: color 0.15s, text-shadow 0.15s;
   }
+
+  #myName:hover,
+  #myName:focus-visible {
+    color: var(--green);
+    text-shadow: 0 0 12px rgba(74,222,128,0.45);
+  }
+
+  #myName:active { transform: translateY(1px); }
 
   #desc {
     color: grey;
@@ -606,6 +616,21 @@ background-color: white;
     gap: 16px;
 }
 
+/* Pixel font for the greeting only — .bio-text and everything else in the
+   box keeps inheriting DM Mono from .bio-box below. */
+.bio-greeting {
+    font-family: 'Silkscreen', monospace;
+    font-size: 18px;
+    line-height: 1.6;
+    letter-spacing: 1px;
+    color: var(--white);
+    margin-bottom: 14px;
+}
+
+.bio-text {
+    margin: 0;
+}
+
 .bio-box {
     flex: 1; /* grow to fill space the quest-box doesn't need */
     display: flex;
@@ -735,6 +760,11 @@ background-color: white;
     color: var(--white);
     padding: 5px 15px;
     font-size: 10px;
+    /* Set explicitly: tags inside .bio-box would otherwise inherit its
+       DM Mono and render differently from the ones in project cards. */
+    font-family: 'Silkscreen', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* --- Footer --- */
@@ -1283,7 +1313,7 @@ background-color: white;
 }
 
 .contact-icon svg {
-    top: 100px;
+    vertical-align: middle;
 }
 
 .contact-label {
@@ -1297,7 +1327,8 @@ background-color: white;
     font-size: 10px;
     color: var(--white);
     font-family: 'DM Mono', monospace;
-    word-break: break-all;
+    overflow-wrap: anywhere;
+    word-break: normal;
     line-height: 1.6;
 }
 
@@ -1342,12 +1373,67 @@ background-color: white;
 #contact .contact-icon { font-size: 13px; }
 #contact .contact-label { font-size: 7px; }
 
+/* === CONTACT: MOBILE ===
+   These must live AFTER the #contact no-scroll block and carry the same
+   ID specificity. Media queries add no specificity, so the plain
+   `.contact-*` rules in the max-width blocks above lose to `#contact .x`
+   and never actually apply on phones. */
+@media (max-width: 700px) {
+    #contact .contact-cards { gap: 10px; }
+
+    #contact .contact-card {
+        padding: 16px 14px;
+        gap: 8px;
+    }
+
+    /* translateY sticks after tap on touch devices */
+    #contact .contact-card:hover { transform: none; }
+
+    #contact .contact-label {
+        font-size: 8px;
+        letter-spacing: 1.5px;
+    }
+
+    #contact .contact-blurb {
+        padding: 12px 14px;
+        font-size: 11px;
+        line-height: 1.7;
+    }
+
+    #contact .contact-input { font-size: 16px; } /* <16px makes iOS zoom on focus */
+}
+
+@media (max-width: 420px) {
+    /* Two columns leaves ~120px of content width — long handles like
+       linkedin.com/in/kyconf shred. Single column instead. */
+    #contact .contact-cards { grid-template-columns: 1fr; }
+
+    #contact .contact-card {
+        flex-direction: row;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 14px 14px;
+    }
+
+    #contact .contact-label {
+        font-size: 8px;
+        letter-spacing: 1px;
+    }
+
+    #contact .contact-value {
+        font-size: 10px;
+        flex-basis: 100%;
+    }
+}
+
 
 .resume-btn {
     display: block;
     margin-top: 1rem;
     padding: 5px 15px;
-    font-family: 'DM Mono', monospace;
+    font-family: 'Silkscreen', monospace;
+    letter-spacing: 1px;
     font-size: 10px;
     color: #ccc;
     background: var(--green-dim);
@@ -1362,25 +1448,124 @@ background-color: white;
     color: #0a1530;
 }
 
+/* Structured to match .pixel-card in the projects grid:
+   color-strip line on top, then title, body copy, tags.
+   Full-bleed across the section — there's only one paper. */
 .paper-box {
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-.paper-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 12px;
-    font-size: 9px;
-    color: var(--green);
-    text-transform: uppercase;
+    width: 100%;
+    margin: 0;
+    padding: 1rem;           /* matches .pixel-card */
 }
 
 .paper-title {
-    font-size: 12px;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: #ffffff;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+}
+
+/* === LEAVE-SITE CONFIRMATION === */
+.confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(10,14,39,0.82);
+    backdrop-filter: blur(2px);
+}
+
+.confirm-overlay[hidden] { display: none; }
+
+.confirm-box {
+    max-width: 460px;
+    width: 100%;
+    padding: 1rem;
+    animation: confirmPop 0.12s ease-out;
+}
+
+@keyframes confirmPop {
+    from { transform: translateY(6px); opacity: 0; }
+    to   { transform: translateY(0);   opacity: 1; }
+}
+
+.confirm-title {
+    font-size: 13px;
+    color: var(--green);
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+}
+
+.confirm-body {
+    font-size: 10px;
+    line-height: 1.8;
+    color: #ccc;
+    margin-bottom: 10px;
+}
+
+.confirm-note {
+    font-size: 9px;
+    line-height: 1.7;
+    color: var(--gray-light);
+    margin-bottom: 18px;
+}
+
+.confirm-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.confirm-btn {
+    flex: 1 1 auto;
+    min-width: 130px;
+    padding: 8px 14px;
+    font-family: 'Silkscreen', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    background: transparent;
+    transition: background 0.15s, color 0.15s;
+}
+
+.confirm-yes {
+    border: 1px solid var(--green);
+    background: var(--green-dim);
+    color: var(--white);
+}
+
+.confirm-yes:hover { background: var(--green); color: var(--navy); }
+
+.confirm-no {
+    border: 1px solid var(--gray);
+    color: var(--gray-light);
+}
+
+.confirm-no:hover { border-color: var(--white); color: var(--white); }
+
+@media (max-width: 420px) {
+    .confirm-btn { flex-basis: 100%; }
+}
+
+.paper-authors {
+    font-size: 9px;
+    line-height: 1.7;
+    color: #8a8a8a;
+    margin-bottom: 4px;
+}
+
+.paper-author-me {
+    color: var(--green);
+}
+
+.paper-venue {
+    font-size: 9px;
+    line-height: 1.6;
+    color: #6f6f6f;
+    margin-bottom: 12px;
 }
 
 .paper-abstract {
@@ -1388,6 +1573,17 @@ background-color: white;
     line-height: 1.6;
     color: #aaa;
     margin-bottom: 12px;
+}
+
+.paper-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.paper-links .resume-btn {
+    flex: 1 1 auto;
+    min-width: 140px;
 }
 
 .paper-link.disabled {
