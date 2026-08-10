@@ -755,7 +755,9 @@ background-color: white;
 }
 
 .tag {
-    background: var(--green-dim);
+    /* Translucent --green rather than flat --green-dim, to match the
+       hover/active treatment used by .nav-item and the about cards. */
+    background: rgba(74, 222, 128, 0.14);
     border: 1px solid var(--green);
     color: var(--white);
     padding: 5px 15px;
