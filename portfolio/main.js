@@ -1379,10 +1379,15 @@ const loader = new GLTFLoader();
 // please never remove, this allows it to even load in browsers
 loader.setDRACOLoader(dracoLoader);
 
+const SCENE_GLB = '/scene-1k.glb';
+
 function startSceneLoad() {
+  console.log(`[load] requesting ${SCENE_GLB}`);
+  const loadStart = performance.now();
   loader.load(
-  '/scene-1k.glb',
+  SCENE_GLB,
   (gltf) => {
+    console.log(`[load] loaded ${SCENE_GLB} in ${Math.round(performance.now() - loadStart)}ms`);
     const model = gltf.scene;
     model.traverse((object) => {
 
@@ -1835,7 +1840,7 @@ function startSceneLoad() {
   (xhr) => {
     const bar = document.getElementById('loadingBarFill');
     const pct = document.getElementById('loadingPercent');
-    const ESTIMATED_GLB_BYTES = 68_309_076;
+    const ESTIMATED_GLB_BYTES = 26_766_960;
     const total = (xhr && xhr.lengthComputable && xhr.total > 0)
       ? xhr.total
       : ESTIMATED_GLB_BYTES;
