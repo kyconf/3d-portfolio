@@ -755,11 +755,11 @@ background-color: white;
 }
 
 .tag {
-    /* Translucent --green rather than flat --green-dim, to match the
-       hover/active treatment used by .nav-item and the about cards. */
-    background: rgba(74, 222, 128, 0.14);
+    /* Same --green as .profile-name / .contact-submit: green text and
+       outline on a transparent fill. */
+    background: transparent;
     border: 1px solid var(--green);
-    color: var(--white);
+    color: var(--green);
     padding: 5px 15px;
     font-size: 10px;
     /* Set explicitly: tags inside .bio-box would otherwise inherit its
@@ -1437,8 +1437,8 @@ background-color: white;
     font-family: 'Silkscreen', monospace;
     letter-spacing: 1px;
     font-size: 10px;
-    color: #ccc;
-    background: var(--green-dim);
+    color: var(--green);
+    background: transparent;
     border: 1px solid var(--green);
     text-decoration: none;
     text-align: center;
@@ -1535,8 +1535,8 @@ background-color: white;
 
 .confirm-yes {
     border: 1px solid var(--green);
-    background: var(--green-dim);
-    color: var(--white);
+    background: transparent;
+    color: var(--green);
 }
 
 .confirm-yes:hover { background: var(--green); color: var(--navy); }
@@ -1831,9 +1831,9 @@ background-color: white;
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
-    background: var(--green-dim);
+    background: transparent;
     border: 1px solid var(--green);
-    color: var(--white);
+    color: var(--green);
     font-family: 'Silkscreen', sans-serif;
     font-size: 10px;
     letter-spacing: 1px;
