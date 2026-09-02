@@ -3128,24 +3128,31 @@ function animateObjectFocus() {
   // Fly to the panned goal when a BMO view is the destination. Aiming at the
   // un-panned pose and letting the pan take over on arrival is what produced
   // the snap-to-the-mouse on the way in.
-  /* Aim at the live pan TARGET, not the smoothed accumulator.
+  /* Aim at the SMOOTHED pan, never the raw target.
 
-     primeBmoPan() used to snap the accumulator to the mouse the instant a pose
-     was set, so the flight had a stable goal. That was fine zooming in from
-     the room (the pan was 0 and stayed 0 in the BMO view) but wrong zooming
-     OUT of the BMO view, where the pan is forced to 0: the accumulator jumped
-     from 0 to the full mouse offset in one frame, and the goal lurched
-     sideways just as the dolly started. That's the small snap on the way out.
+     Three things were tried here, so the reasoning is worth keeping:
 
-     Aiming at the target instead means the goal is correct and stationary from
-     frame one, with nothing to jump. The accumulator damps toward the same
-     value during the ~1s flight (time constant ~330ms), so by the time the
-     hold takes over the two agree and the handover is seamless. */
+       1. Aim un-panned, and let the hold hard-set the panned pose on arrival.
+          The camera landed centred and then jumped the full offset — the
+          original "zoom in, then snap to the mouse".
+       2. Snap the accumulator to the mouse when the pose is set (primeBmoPan),
+          so the goal is right from frame one. Fine zooming in, but zooming OUT
+          of the BMO view the pan is forced to 0, so the accumulator jumped 0 →
+          full offset in a single frame and the goal lurched sideways.
+       3. Aim at the raw target. Stable across a transition, but the target
+          follows the mouse with no smoothing at all, so flicking the pointer
+          mid-flight yanked the goal — the snap when you leave the face and
+          dart to his body.
+
+     The accumulator is the answer to all three: it is continuous by
+     construction, so it can't jump on a state change, and it damps (~330ms)
+     so it can't be yanked. The hold damps toward the same value, which is what
+     makes the handover seamless — that, not the priming, was the real fix. */
   _focusGoalPos.copy(focusCameraPosition);
   _focusGoalTgt.copy(focusControlsTarget);
   if (isFocusedOnBMO) {
-    _focusGoalPos.add(bmoParallaxTarget);
-    _focusGoalTgt.add(bmoParallaxTarget);
+    _focusGoalPos.add(bmoParallaxCurrent);
+    _focusGoalTgt.add(bmoParallaxCurrent);
   }
 
   camera.position.x = THREE.MathUtils.damp(camera.position.x, _focusGoalPos.x, smoothness, delta);
@@ -3570,8 +3577,30 @@ const SCREEN_EXPAND = 1;
 let screenDesignW = SCREEN_DESIGN_WIDTH;
 let screenDesignH = 838;
 
+/* Keyframes for the refresh sweep. Injected rather than kept in a stylesheet
+   because everything else about this overlay is built here too. Honours
+   prefers-reduced-motion: the band parks out of frame instead of drifting. */
+function injectScreenGlassStyles() {
+  if (document.getElementById('bmo-screen-glass-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'bmo-screen-glass-styles';
+  style.textContent = `
+    /* Alternates instead of looping: a band that wraps has to jump back to
+       the start, and at this alpha the jump is the only thing you'd notice. */
+    @keyframes bmoScreenSweep {
+      from { transform: translateX(-45%); }
+      to   { transform: translateX(430%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #bmo-screen-sweep { animation: none !important; opacity: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function mountScreenIframe() {
   if (screenOverlay) return;
+  injectScreenGlassStyles();
 
   if (tvScreenMesh) {
     const box = new THREE.Box3().setFromObject(tvScreenMesh);
@@ -3610,6 +3639,23 @@ function mountScreenIframe() {
 
   // Non-interactive CRT cues, so the site reads as a screen rather than a
   // browser window pasted over the scene.
+  /* Grime, not scanlines.
+
+     The first pass leaned on a hard scanline + RGB grille, which reads as a
+     filter laid over the page. What actually sells a real tube is that the
+     glass is DIRTY and the phosphor is UNEVEN: soft smudges, a few brighter
+     patches, a faint colour drift across the face, and light pooling in the
+     middle. So the structure is dialled right back and the irregularity does
+     the work.
+
+     Layer order (front to back):
+       1. glare       the room on the curve of the glass
+       2. smudges     four soft off-centre blooms at 2-3%, deliberately not on
+                      a grid — regular spacing is what makes an overlay look
+                      procedural
+       3. colour cast one warm and one cool pool, so the white isn't uniform
+       4. scanlines   still there, but at 6% instead of 13% — felt, not seen
+       5. vignette    light pooling centre, falling into the corners */
   const glass = document.createElement('div');
   glass.style.cssText = `
     position: absolute;
@@ -3617,18 +3663,54 @@ function mountScreenIframe() {
     pointer-events: none;
     border-radius: ${SCREEN_CORNER_RADIUS};
     background:
-      linear-gradient(105deg,
-        rgba(255,255,255,0.13) 0%,
-        rgba(255,255,255,0.05) 17%,
-        rgba(255,255,255,0.00) 33%),
+      linear-gradient(108deg,
+        rgba(255,255,255,0.10) 0%,
+        rgba(255,255,255,0.04) 15%,
+        rgba(255,255,255,0.00) 32%),
+      radial-gradient(38% 26% at 27% 31%, rgba(255,255,255,0.030), rgba(255,255,255,0) 70%),
+      radial-gradient(30% 34% at 71% 22%, rgba(255,255,255,0.024), rgba(255,255,255,0) 72%),
+      radial-gradient(44% 30% at 62% 74%, rgba(255,255,255,0.022), rgba(255,255,255,0) 70%),
+      radial-gradient(26% 22% at 18% 68%, rgba(255,255,255,0.018), rgba(255,255,255,0) 74%),
+      radial-gradient(52% 44% at 78% 44%, rgba(255,238,190,0.030), rgba(255,238,190,0) 72%),
+      radial-gradient(48% 40% at 22% 56%, rgba(190,232,255,0.026), rgba(190,232,255,0) 74%),
       repeating-linear-gradient(to bottom,
-        rgba(0,0,0,0.10) 0px, rgba(0,0,0,0.10) 2px,
-        rgba(0,0,0,0.00) 2px, rgba(0,0,0,0.00) 4px),
-      radial-gradient(ellipse at 50% 50%,
-        rgba(0,0,0,0.00) 55%, rgba(0,0,0,0.34) 100%);
-    box-shadow: inset 0 0 55px rgba(0,0,0,0.40);
+        rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px,
+        rgba(0,0,0,0.00) 1px, rgba(0,0,0,0.00) 3px),
+      radial-gradient(ellipse at 50% 46%,
+        rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.00) 46%,
+        rgba(0,0,0,0.14) 78%, rgba(0,0,0,0.40) 100%);
+    box-shadow:
+      inset 0 0 64px rgba(0,0,0,0.40),
+      inset 0 2px 0 rgba(255,255,255,0.13),
+      inset 0 -2px 0 rgba(0,0,0,0.28),
+      inset 7px 0 15px -10px rgba(90,180,255,0.24),
+      inset -7px 0 15px -10px rgba(255,120,90,0.20);
   `;
   screenOverlay.appendChild(glass);
+
+  /* A wide, very faint vertical band drifting across the face — the slow
+     side-to-side shimmer of a tube rather than a refresh bar rolling down it.
+     Peak alpha 3.5%, so it should be something you notice on the second look.
+     Transform only, so it stays on the compositor. */
+  const sweep = document.createElement('div');
+  sweep.id = 'bmo-screen-sweep';
+  sweep.style.cssText = `
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 26%;
+    pointer-events: none;
+    background: linear-gradient(to right,
+      rgba(255,255,255,0.000) 0%,
+      rgba(255,255,255,0.018) 38%,
+      rgba(255,255,255,0.035) 52%,
+      rgba(255,255,255,0.014) 66%,
+      rgba(255,255,255,0.000) 100%);
+    will-change: transform;
+    animation: bmoScreenSweep 13s ease-in-out infinite alternate;
+  `;
+  screenOverlay.appendChild(sweep);
   document.body.appendChild(screenOverlay);
 
   screenMounted = true;

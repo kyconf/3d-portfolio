@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>kyle's portfolio</title>
 <link rel="icon" type="image/png" href="bmoicon2.png">
-<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;700&family=Silkscreen&family=DM+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
 
@@ -32,6 +32,10 @@
        so the desktop keeps everything out of them. The site still fills the
        glass edge to edge — only the content is held in. */
     --screen-safe: 30px;
+    /* The titlebar and address bar of a maximised window sit deepest into the
+       rounded corners, so they get a bigger inset than the desktop furniture.
+       One value for both rows keeps their left edges aligned. */
+    --chrome-safe: 58px;
   }
 
   .maximized {
@@ -44,13 +48,16 @@
   border-radius: 0 !important;
 }
 
-  /* Only the titlebar sits inside the rounded corners, so it is the one row
-     that needs the safe area — the window itself does not. Its text and its
-     buttons are pulled in; everything below is past the curve already. */
-  .maximized > .titlebar{
-    padding-left: var(--screen-safe);
-    padding-right: var(--screen-safe);
+  /* A maximised window runs edge to edge, so its chrome rows are the ones that
+     land in the rounded corners — the window itself stays full-bleed and only
+     its CONTENTS are pulled in. Written against .maximized rather than a
+     specific window, so the terminal gets it the moment it's maximised too. */
+  .maximized > .titlebar,
+  .maximized > .address-bar{
+    padding-left: var(--chrome-safe);
+    padding-right: var(--chrome-safe);
   }
+
 
   body{
     background: var(--bmo-green);
@@ -189,19 +196,22 @@ body {
   .titlebar{
     display:flex;align-items:center;justify-content:space-between;
     padding:5px 8px;
-    font-family:'Pixelify Sans',sans-serif;font-size:12px;
+    font-family:'Silkscreen',monospace;font-size:12px;
     flex-shrink:0;cursor:default;
     border-bottom:2px solid var(--bmo-teal);
   }
   .titlebar-buttons{display:flex;gap:5px;}
   .titlebar-buttons span{
-    width:14px;height:14px;border-radius:50%;
+    width:16px;height:16px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
-    font-size:7px;cursor:pointer;transition:transform 0.1s;
-    font-family:'Silkscreen',monospace;
+    cursor:pointer;transition:transform 0.1s;
   }
+  /* The glyph takes the button's own text colour, so each one is already
+     tuned for contrast against its fill: dark on yellow and green, white on
+     red. crispEdges keeps the 2px grid sharp at this size. */
+  .titlebar-buttons span svg{width:10px;height:10px;display:block;}
   .titlebar-buttons span:active{transform:scale(0.85);}
-  .btn-close{background:var(--bmo-red-btn);color:var(--bmo-white);}
+  .btn-close{background:var(--bmo-red-btn);color:var(--bmo-dark);}
   .btn-min{background:var(--bmo-yellow);color:var(--bmo-dark);}
   .btn-max{background:var(--bmo-green-dark);color:var(--bmo-dark);}
 
@@ -250,7 +260,7 @@ body {
     background:var(--bmo-teal);color:var(--bmo-yellow);
   }
   .terminal-lines{
-    font-family:'DM Mono',monospace;font-size:11px;line-height:1.65;white-space:pre;
+    font-family:'Silkscreen',monospace;font-size:10px;line-height:1.85;white-space:pre;
   }
   .t-blue{color:var(--bmo-blue);}
   .t-blue-dim{color:var(--bmo-blue-dim);}
@@ -291,7 +301,7 @@ body {
     font-size:10px;
     display:flex;align-items:center;justify-content:center;
     cursor:default;
-    font-family:'DM Mono',monospace;
+    font-family:'Silkscreen',monospace;
   }
   .address-bar .url-box{
     flex:1;
@@ -299,7 +309,7 @@ body {
     border:1px solid var(--bmo-teal);
     border-radius:3px;
     padding:3px 8px;
-    font-family:'DM Mono',monospace;
+    font-family:'Silkscreen',monospace;
     font-size:10px;
     color:var(--bmo-white);
     display:flex;align-items:center;gap:4px;
@@ -326,7 +336,7 @@ body {
     position:absolute;inset:0;
     display:flex;align-items:center;justify-content:center;
     text-align:center;
-    font-family:'Pixelify Sans',sans-serif;
+    font-family:'Silkscreen',monospace;
     color:var(--bmo-green);
   }
   .browser-loading .spinner{
@@ -388,19 +398,19 @@ body {
   .mini-player-btn:hover{background:var(--bmo-teal);}
 
   .clock{
-    margin-left:auto;font-family:'DM Mono',monospace;
+    margin-left:auto;font-family:'Silkscreen',monospace;
     font-size:10px;color:var(--bmo-yellow);
   }
 
   .version{
     position:absolute;bottom:42px;right:var(--screen-safe);
-    font-family:'DM Mono',monospace;font-size:7px;
+    font-family:'Silkscreen',monospace;font-size:7px;
     color:var(--bmo-green-darker);z-index:1;
   }
 
   .pixel-football{
     position:absolute;bottom:52px;left:var(--screen-safe);z-index:1;
-    font-family:'Pixelify Sans',sans-serif;font-size:9px;
+    font-family:'Silkscreen',monospace;font-size:9px;
     color:var(--bmo-teal);text-align:center;
     cursor:pointer;
   }
@@ -514,10 +524,10 @@ body {
   <div class="titlebar">
     BMO TERMINAL
     <div class="titlebar-buttons">
-      <span class="btn-min" onclick="toggleWindow('terminal')"></span>
-      <span class="btn-max" onclick="maximizeWindow('terminal')"></span>
+      <span class="btn-min" onclick="toggleWindow('terminal')"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M4 11h16v2H4z"/></svg></span>
+      <span class="btn-max" onclick="maximizeWindow('terminal')"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M2 4h2v16H2zm2 16h16v2H4zM20 4h2v16h-2zM4 2h16v2H4z"/></svg></span>
     
-      <span class="btn-close" onclick="closeWindow('terminal')"></span>  
+      <span class="btn-close" onclick="closeWindow('terminal')"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M7 19H5V17H7V19ZM19 19H17V17H19V19ZM9 15V17H7V15H9ZM17 17H15V15H17V17ZM11 15H9V13H11V15ZM15 15H13V13H15V15ZM13 13H11V11H13V13ZM11 11H9V9H11V11ZM15 11H13V9H15V11ZM9 9H7V7H9V9ZM17 9H15V7H17V9ZM7 7H5V5H7V7ZM19 7H17V5H19V7Z"/></svg></span>  
     </div>
   </div>
   <div class="window-body" style="overflow-y:auto;">
@@ -530,10 +540,10 @@ body {
   <div class="titlebar">
     BMO BROWSER
     <div class="titlebar-buttons">
-           <span class="btn-min" onclick="toggleWindow('browser')"></span>
-       <span class="btn-max" onclick="maximizeWindow('browser')"></span>
+           <span class="btn-min" onclick="toggleWindow('browser')"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M4 11h16v2H4z"/></svg></span>
+       <span class="btn-max" onclick="maximizeWindow('browser')"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M2 4h2v16H2zm2 16h16v2H4zM20 4h2v16h-2zM4 2h16v2H4z"/></svg></span>
  
-      <span class="btn-close" onclick="closeWindow('browser')"></span>
+      <span class="btn-close" onclick="closeWindow('browser')"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M7 19H5V17H7V19ZM19 19H17V17H19V19ZM9 15V17H7V15H9ZM17 17H15V15H17V17ZM11 15H9V13H11V15ZM15 15H13V13H15V15ZM13 13H11V11H13V13ZM11 11H9V9H11V11ZM15 11H13V9H15V11ZM9 9H7V7H9V9ZM17 9H15V7H17V9ZM7 7H5V5H7V7ZM19 7H17V5H19V7Z"/></svg></span>
     </div>
   </div>
   <div class="address-bar">
@@ -582,9 +592,6 @@ body {
   <div class="task-item" id="taskTerminal" onclick="toggleWindow('terminal')"><svg class="pxi" width="11px" height="11px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M16 19h2v2H4v-2h10v-2h2v2ZM6 15h8v2H4v2H2v-4h2V5h2v10ZM20 5h2v6h-2v8h-2V5H6V3h14v2Z"/></svg> terminal</div>
   <div class="task-item task-hidden" id="taskBrowser" onclick="toggleWindow('browser')"><svg class="pxi" width="11px" height="11px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M6 2h12v2H6zm0 18h12v2H6zM4 4h2v2H4zm5 0h2v2H9zm0 14h2v2H9zm4 0h2v2h-2zM7 6h2v12H7zm8 0h2v12h-2zm-2-2h2v2h-2zm7 0h-2v2h2zM2 6h2v12H2zm20 0h-2v12h2zM4 18h2v2H4zm16 0h-2v2h2z"/>
   <path d="M3 11h18v2H3z"/></svg> browser</div>
-
-  <a class="task-item" id="backTo3D" href="/" style="text-decoration:none;"><svg class="pxi" width="11px" height="11px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/>
-  <path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg> 3d room</a>
   <div class="clock" id="clock">00:00</div>
 </div>
 
