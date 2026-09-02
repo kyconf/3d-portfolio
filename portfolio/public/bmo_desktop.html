@@ -209,7 +209,16 @@ body {
   /* The glyph takes the button's own text colour, so each one is already
      tuned for contrast against its fill: dark on yellow and green, white on
      red. crispEdges keeps the 2px grid sharp at this size. */
-  .titlebar-buttons span svg{width:10px;height:10px;display:block;}
+  /* 12px, not 10. These glyphs are drawn on a 24-unit grid with 2-unit
+     strokes, so at 10px a stroke lands on 0.83 of a pixel — and with
+     crispEdges some edges round up to 1px while others round away entirely.
+     That is why the fullscreen square was only drawing half its outline. At
+     12px a stroke is exactly 1px, and geometricPrecision keeps all four sides
+     at equal weight once the whole desktop gets scaled onto the screen. */
+  .titlebar-buttons span svg{
+    width:12px;height:12px;display:block;
+    shape-rendering:geometricPrecision;
+  }
   .titlebar-buttons span:active{transform:scale(0.85);}
   .btn-close{background:var(--bmo-red-btn);color:var(--bmo-dark);}
   .btn-min{background:var(--bmo-yellow);color:var(--bmo-dark);}

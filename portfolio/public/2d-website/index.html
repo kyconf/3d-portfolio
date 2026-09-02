@@ -109,9 +109,15 @@
                         <span class="quest-dot"></span>
                         <span class="quest-text">Learning more about AI / ML & Networks</span>
                     </div>
-                        <div class="quest-item">
+                    <div class="quest-item">
                         <span class="quest-dot"></span>
-                        <span class="quest-text">Getting my CompTIA Security+ Certification</span>
+                        <span class="quest-text">Getting my Microsoft Azure Fundamentals (AZ-900) Certification</span>
+                    </div>
+
+                    <p class="stat-header quest-header--done">✔ COMPLETED</p>
+                    <div class="quest-item quest-item--done">
+                        <span class="quest-dot"></span>
+                        <span class="quest-text">CompTIA Security+ Certification</span>
                     </div>
                 </div>
             </div>
@@ -294,6 +300,16 @@
     display: block;
     width: 100%;
     margin-top: -40px;
+    /* This one is a PHOTO, not pixel art. .avatar-img sets
+       image-rendering:pixelated for pxArt.png, and inheriting it here made a
+       downscaled JPEG render nearest-neighbour. Worse, .profile-card:hover
+       applies a transform, which promotes the card to its own compositing
+       layer and re-rasterises the image — so the photo visibly changed
+       sampling the moment you hovered it. Smooth scaling, always, and the
+       layer is promoted up front so hovering changes nothing. */
+    image-rendering: auto;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 /* Pixel art overlays on top */
@@ -304,11 +320,15 @@
     object-fit: cover;
     image-rendering: pixelated;
     opacity: 1;
-    transition: opacity 1.8s ease-in-out;
+    /* visibility flips only once the fade has finished */
+    transition: opacity 1.8s ease-in-out, visibility 0s linear 1.8s;
 }
 
 .avatar-pixel.fade-out {
     opacity: 0;
+    /* Out of the compositor entirely once faded, so there is nothing left
+       stacked over the photo to blend with or re-rasterise. */
+    visibility: hidden;
 }
 </style>
 

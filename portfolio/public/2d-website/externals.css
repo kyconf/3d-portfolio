@@ -460,10 +460,17 @@ background-color: white;
     color: var(--gray-light);
     text-decoration: none;
     font-size: 14px;
+    /* Right edge only. Setting BOTH borders stacked two 1px rules between
+       every pair of tabs, so the interior dividers rendered at 2px while the
+       far left of ABOUT and the far right of CONTACT — which have no
+       neighbour to double with — stayed at 1px and looked thinner. */
     border-right: 1px solid var(--gray);
-    border-left: 1px solid var(--gray);
     transition: 0.2s;
     cursor: pointer;
+}
+
+.nav-item:first-child {
+    border-left: 1px solid var(--gray);
 }
 
 .nav-item.active {
@@ -662,6 +669,16 @@ background-color: white;
     height: 8px;
     background: var(--green);
     flex-shrink: 0;
+}
+
+/* Finished quests sit in the same box, dimmed — it reads as a log rather than
+   only a to-do list, and the cert stays visible instead of disappearing. */
+.quest-header--done {
+    margin-top: 22px;
+}
+
+.quest-item--done .quest-text {
+    opacity: 0.6;
 }
 
 /* Origin Story / Biography */

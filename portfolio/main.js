@@ -1304,11 +1304,18 @@ let bmoExitTimer = null;
 // staying in is tested against a looser one so the edge doesn't flicker. Both
 // are the FACE, never the body — see the VIEW_DESK case in evaluateHoverFocus.
 const FACE_ENTER_MARGIN = 0.06;
-/* Kept small on purpose. At BMO_SCREEN_DISTANCE the screen already fills ~73%
-   of the frame height, so every point of margin is expensive: at 0.28 the
-   "still on the face" box came out 114% of the viewport tall, leaving nowhere
-   to be outside it vertically and about 18px a side horizontally. */
-const FACE_EXIT_MARGIN  = 0.10;
+
+/* Leaving the BMO view is measured against the VIEWPORT, not against BMO.
+
+   The screen covers roughly the middle 60% of the frame at this distance, so
+   testing "off the screen rect" meant that drifting a little onto his body
+   already counted as leaving. Now you have to move out to the band where the
+   room actually is — the outer 14% on any side. Everything inside that, his
+   body and bezel included, still counts as staying on him.
+
+   A raycast can't answer this: this close his bounding box covers the whole
+   viewport, so the picker says "on BMO" wherever the cursor is. */
+const BMO_EXIT_VIEWPORT_INSET = 0.14;
 
 let isIntroView = false;
 
@@ -1611,6 +1618,16 @@ function screenRectOnViewport() {
   return { left: minX, right: maxX, top: minY, bottom: maxY };
 }
 
+/* Has the pointer moved out to the room, i.e. into the outer band of the
+   viewport? An invalid pointer (left the window entirely) counts as away. */
+function isPointerInRoomArea() {
+  if (!pointerClient.valid) return true;
+  const mx = window.innerWidth  * BMO_EXIT_VIEWPORT_INSET;
+  const my = window.innerHeight * BMO_EXIT_VIEWPORT_INSET;
+  return pointerClient.x < mx || pointerClient.x > window.innerWidth  - mx ||
+         pointerClient.y < my || pointerClient.y > window.innerHeight - my;
+}
+
 /* Is the cursor on the screen (plus a forgiving margin)? */
 function isPointerOverScreen(margin = 0.18) {
   if (!pointerClient.valid) return false;
@@ -1827,15 +1844,9 @@ function evaluateHoverFocus(hovered) {
       break;
 
     case VIEW_BMO:
-      /* Deliberately not `onBmo`: this close, his bounding box covers the
-         whole viewport, so the picker always says yes and the step back could
-         never fire.
-
-         Once the site is mounted the iframe covers the screen exactly and
-         swallows its own pointermove, so an event arriving here already means
-         the cursor has left it — exact, and nothing to tune. Before boot there
-         is no overlay, so fall back to the projected rect. */
-      if (!isBrowsingScreen && isPointerOverScreen(FACE_EXIT_MARGIN)) {
+      /* Staying is anywhere in the middle of the frame — the screen, the
+         bezel, his body. Leaving is the outer band, where the room is. */
+      if (!isPointerInRoomArea()) {
         clearBmoExitTimer();
       } else if (!bmoExitTimer) {
         bmoExitTimer = setTimeout(() => {
@@ -3585,11 +3596,14 @@ function injectScreenGlassStyles() {
   const style = document.createElement('style');
   style.id = 'bmo-screen-glass-styles';
   style.textContent = `
-    /* Alternates instead of looping: a band that wraps has to jump back to
-       the start, and at this alpha the jump is the only thing you'd notice. */
+    /* One direction only, right to left. The wrap is invisible because the
+       band is fully outside the screen at BOTH ends of the travel — at 400%
+       its left edge is past the right side, at -110% its right edge is past
+       the left — so there is no frame where the reset can be seen. Linear,
+       because an eased one-way loop visibly slows down at the seam. */
     @keyframes bmoScreenSweep {
-      from { transform: translateX(-45%); }
-      to   { transform: translateX(430%); }
+      from { transform: translateX(400%); }
+      to   { transform: translateX(-110%); }
     }
     @media (prefers-reduced-motion: reduce) {
       #bmo-screen-sweep { animation: none !important; opacity: 0; }
@@ -3708,7 +3722,7 @@ function mountScreenIframe() {
       rgba(255,255,255,0.014) 66%,
       rgba(255,255,255,0.000) 100%);
     will-change: transform;
-    animation: bmoScreenSweep 13s ease-in-out infinite alternate;
+    animation: bmoScreenSweep 13s linear infinite;
   `;
   screenOverlay.appendChild(sweep);
   document.body.appendChild(screenOverlay);
