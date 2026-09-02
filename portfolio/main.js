@@ -44,7 +44,13 @@ function warmAudio() {
 }
 // Scene + shared state
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x5f6163);
+// Single source of truth for the sky, lerped by the day/night transition.
+// 0x1d2a43 is not the colour you see: OutputPass runs ACES tone mapping at
+// exposure 0.7 over the whole buffer, background included, so this lands on
+// screen as ~#0a1530 — the same deep navy as the UI chrome. Pick a new value
+// by what it looks like after that curve, not by the hex.
+const skyColor = new THREE.Color(0x1d2a43);
+scene.background = skyColor;
 let isVideoPlaying = false;
 let selectedObject = null;
 let tvScreenMesh = null;
@@ -54,10 +60,24 @@ let isFocusedOnBMO = false;
 let bmoObject = null;
 let mcbed = null;
 let onFocusComplete = null;
-let hasOpenedStaticScreen = false;
+// A flight into the 2D site is in progress (guards against starting it twice).
+let screenOpening = false;
+// The iframe exists. It is created ONCE and then kept alive for the whole
+// visit — never torn down — so hovering out to the desk and back in returns
+// you to the site exactly where you left it.
+let screenMounted = false;
+// Once the intro video has played through, later clicks go straight to the
+// desktop instead of making people sit through it again.
+let bmoVideoWatched = false;
+// Set when BMO is clicked before the intro video has buffered. The 'canplay'
+// handler drains it, so an early click starts the video the moment it's ready
+// instead of being silently swallowed.
+let pendingVideoPlay = false;
 let updateTV = null;
+let updateClock = null;
 let ukulele = null;
 let whiteboardShadow = null;
+let whiteboardObject = null;
 let switchMesh = null;
 let drawWB = null;
 // focusPresets — per-object camera/target offsets used by focusOnObject
@@ -87,6 +107,41 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
 document.body.appendChild(renderer.domElement);
 renderer.domElement.style.opacity = '0';
 renderer.domElement.style.transition = 'opacity 0.9s ease-out';
+renderer.domElement.style.position = 'relative';
+renderer.domElement.style.zIndex = '1';
+// A canvas is display:inline by default, so it sits on a text baseline and
+// leaves a few pixels of descender space below it. That made the document
+// marginally taller than the viewport, so the page itself scrolled: the canvas
+// (position:relative) moved with it while the CSS3D layer (position:fixed)
+// did not, sliding BMO's screen out of register with the iframe on it.
+renderer.domElement.style.display = 'block';
+document.documentElement.style.overflow = 'hidden';
+document.body.style.overflow = 'hidden';
+document.body.style.height = '100%';
+
+/* The 2D site (/bmo_desktop) is shown on BMO's screen as a flat fixed-position
+   overlay — see mountScreenIframe. It was a CSS3D layer transformed onto the
+   screen plane, which looked right but could not receive clicks. */
+const INLINE_SCREEN = !new URLSearchParams(location.search).has('classicscreen');
+
+// Shrinks the iframe relative to the screen plane so BMO's bezel — which sits
+// ~0.1 units closer to camera and therefore projects larger — doesn't get
+// overlapped at the corners. Raise toward 1.0 for a fuller screen.
+const SCREEN_INSET = 1.0;
+
+// Corner rounding, in iframe pixels — the iframe is 1200px wide before being
+// scaled down onto the mesh, so these are ~5-6% of its width, matched to the
+// curve of BMO's screen cutout rather than literal on-screen pixel values.
+// Bottom corners are tighter than the top, following the body's shape.
+const SCREEN_RADIUS_TOP = 60;
+const SCREEN_RADIUS_BOTTOM = 30;
+// CSS order: top-left, top-right, bottom-right, bottom-left.
+const SCREEN_CORNER_RADIUS =
+  `${SCREEN_RADIUS_TOP}px ${SCREEN_RADIUS_TOP}px ${SCREEN_RADIUS_BOTTOM}px ${SCREEN_RADIUS_BOTTOM}px`;
+
+let screenIframe = null;
+let screenOverlay = null;
+let isBrowsingScreen = false;
 
 // Disable text/cursor selection on all elements globally
 const noSelectStyle = document.createElement('style');
@@ -521,7 +576,7 @@ document.body.appendChild(helpBtn);
 
 // Tooltip that appears beside the ? button when the scene first loads
 const helpTooltip = document.createElement('div');
-helpTooltip.textContent = 'click an object to focus on it · press esc to reset view';
+helpTooltip.textContent = 'hover BMO to move in · move off him to step back · click anywhere for the full room';
 helpTooltip.style.cssText = `
   position: fixed;
   bottom: 30px;
@@ -595,13 +650,16 @@ helpOverlay.innerHTML = `
       how to explore
     </div>
     <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px;font-size:11px;line-height:1.8;letter-spacing:1px;">
+      <li> <strong>move the mouse</strong> - look around the desk</li>
+      <li> <strong>hover BMO</strong> - move in: desk view, then his screen</li>
+      <li> <strong>move off BMO</strong> - step back out to the desk view</li>
+      <li> <strong>left click anywhere</strong> - pull back to the full 3D room</li>
       <li> <strong>click + drag</strong> - rotate the camera around the room</li>
       <li> <strong>scroll</strong> - zoom in and out</li>
-      <li> <strong>click an object</strong> - focus in on it</li>
-      <li> <strong>esc</strong> - return to the default 3D view</li>
+      <li> <strong>click an object</strong> - focus in on it (hover BMO or the whiteboard to zoom straight in)</li>
       
       <center> <li> -- examples -- </li></center>
-      <li> <strong>BMO (the little robot) </strong> - click BMO to focus, click again to play</li>
+      <li> <strong>BMO (the little robot) </strong> - hover in to his screen and use the site on it</li>
       <li> <strong>light switch</strong> - toggle day / night</li>
       <li> <strong>the bed</strong> - you can try</li>
     </ul>
@@ -918,7 +976,7 @@ let groundPlaneDayColor = null;
 const GROUND_NIGHT_COLOR = new THREE.Color(0x5f6163);
 
 const NIGHT_PALETTE = {
-  background:        new THREE.Color(0x5f6163),
+  background:        new THREE.Color(0x1d2a43),  // tone-maps to ~#0a1530
   beamColor:         new THREE.Color(0xd8e0f0),
   beamIntensity:     0.9,
   moonColor:         new THREE.Color(0xb0c0e0),
@@ -1032,7 +1090,7 @@ function setDayNight(toDay) {
     : GROUND_NIGHT_COLOR;
 
   const start = {
-    background:        scene.background.clone(),
+    background:        skyColor.clone(),
     moonColor:         moonFill.color.clone(),
     moonIntensity:     moonFill.intensity,
     ambientColor:      ambientLight.color.clone(),
@@ -1068,7 +1126,7 @@ function setDayNight(toDay) {
     const t = Math.min(elapsed / duration, 1);
     const eased = t * t * (3 - 2 * t);
 
-    scene.background.copy(start.background).lerp(to.background, eased);
+    skyColor.copy(start.background).lerp(to.background, eased);
     moonFill.color.copy(start.moonColor).lerp(to.moonColor, eased);
     moonFill.intensity = THREE.MathUtils.lerp(start.moonIntensity, to.moonIntensity, eased);
     ambientLight.color.copy(start.ambientColor).lerp(to.ambientColor, eased);
@@ -1113,11 +1171,83 @@ function setDayNight(toDay) {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-controls.maxPolarAngle = Math.PI / 2 - 0.05;
-controls.minPolarAngle = 0.15;
+// Room-view orbit limits. These are deliberately lifted while the camera is
+// flying to (or holding) a focus pose: several focus framings sit dead on the
+// horizontal, i.e. at polar angle exactly PI/2, which is OUTSIDE this range.
+// Leaving the clamp on meant controls.update() shoved the camera back 0.05rad
+// every frame, the "arrived" test never passed, and the 3s timeout finished
+// the move with a hard snap.
+const ORBIT_MIN_POLAR = 0.15;
+const ORBIT_MAX_POLAR = Math.PI / 2 - 0.05;
+controls.maxPolarAngle = ORBIT_MAX_POLAR;
+controls.minPolarAngle = ORBIT_MIN_POLAR;
+
+let orbitLimitsFreed = false;
+function freeOrbitLimits(free) {
+  if (free === orbitLimitsFreed) return;
+  orbitLimitsFreed = free;
+  controls.minPolarAngle = free ? 0.001 : ORBIT_MIN_POLAR;
+  controls.maxPolarAngle = free ? Math.PI - 0.001 : ORBIT_MAX_POLAR;
+}
+
+/* Called at the start of every scripted camera move. Frees the limits and
+   flushes any leftover drag inertia — with enableDamping on, OrbitControls
+   keeps applying the last spin for many frames, which would otherwise bleed
+   into the focus move and leave it off-mark. */
+const _txPos  = new THREE.Vector3();
+const _txQuat = new THREE.Quaternion();
+const _txDir  = new THREE.Vector3();
+
+function beginCameraTransition() {
+  freeOrbitLimits(true);
+
+  /* Reconcile controls.target with where the camera is ACTUALLY pointing
+     before anything reads it.
+
+     While a BMO view is held, the mouse-pan aims the camera at
+     focusControlsTarget + panOffset, but controls.target still holds the
+     un-panned point. Both controls.update() below and animateObjectFocus do
+     camera.lookAt(controls.target), so starting a move without reconciling
+     them re-aimed the camera by the whole pan offset on frame one — the view
+     jumped to the un-panned desk pose and only then began to dolly. */
+  const dist = Math.max(camera.position.distanceTo(controls.target), 0.001);
+  _txDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  controls.target.copy(camera.position).addScaledVector(_txDir, dist);
+
+  /* Flush leftover drag inertia (with damping off, update() clears
+     sphericalDelta/scale), then restore the camera exactly — update() also
+     re-derives position from the spherical and re-runs lookAt, and neither
+     should be allowed to nudge the starting pose of the move. */
+  _txPos.copy(camera.position);
+  _txQuat.copy(camera.quaternion);
+  controls.enableDamping = false;
+  controls.update();
+  controls.enableDamping = true;
+  camera.position.copy(_txPos);
+  camera.quaternion.copy(_txQuat);
+}
 
 const defaultCameraPosition = new THREE.Vector3();
 const defaultControlsTarget = new THREE.Vector3();
+
+// --- Hover to focus --------------------------------------------------------
+// The idle auto-drift that used to live here is gone: the camera only moves
+// when you ask it to. Instead, hovering BMO dollies the camera in and hovering
+// away eases it back to the room view.
+let userIsInteracting = false;
+let hoverFocusActive = false;         // camera is in a hover-driven focus
+let hoverFocusSubject = null;        // which subject owns it ('bmo' | 'whiteboard')
+// Hovering away no longer pulls the camera back — a left click anywhere is the
+// way out. But after returning to the room view the cursor is often still
+// parked on the thing we just left, so hover-in is latched off until the
+// pointer is seen somewhere that isn't a focus subject.
+let hoverRearmNeeded = false;
+const supportsHoverFocus = typeof window.matchMedia === 'function'
+  ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  : true;
+
+controls.addEventListener('start', () => { userIsInteracting = true; });
+controls.addEventListener('end',   () => { userIsInteracting = false; });
 
 let isEscapeAnimating = false;
 let lastEscapeTime = 0;
@@ -1132,9 +1262,58 @@ const mouseNDC = new THREE.Vector2();
 const bmoParallaxCurrent  = new THREE.Vector3();
 const bmoParallaxVelocity = new THREE.Vector3(); // spring velocity
 const bmoParallaxTarget   = new THREE.Vector3();
-const BMO_PARALLAX_STRENGTH = 0.1;  // max offset in world units
-const BMO_PARALLAX_STIFFNESS = 80;  // spring pull strength
-const BMO_PARALLAX_DAMPING   = 12;
+// Mouse-driven pan while the camera is held on BMO's desk. Expressed as a
+// fraction of the camera's distance to its target, so the pan feels the same
+// whether you're at the wide intro framing or dollied in close.
+const BMO_PAN_X_FRACTION = 0.11;   // full mouse deflection, left/right
+const BMO_PAN_Y_FRACTION = 0.05;   // full mouse deflection, up/down
+/* The two constants that decide how the mouse-look feels. Mouse input has no
+   smoothing of its own — the target jumps the instant the pointer does — so
+   these are the only thing between a flick of the wrist and the camera. At
+   6/8 the camera covered most of its pan travel in ~200ms, which read as a
+   snap rather than a drift. Lower = slower, heavier, calmer. */
+const BMO_PAN_SMOOTHNESS = 3;      // how fast the pan target is chased
+const BMO_HOLD_SMOOTHNESS = 4.5;   // how hard the camera holds the panned pose
+let lastPanTime = performance.now();
+const _panLookAt   = new THREE.Vector3();
+const WORLD_UP     = new THREE.Vector3(0, 1, 0);
+const _focusGoalPos = new THREE.Vector3();
+const _focusGoalTgt = new THREE.Vector3();
+
+/* The views, and the only transitions between them:
+
+     INTRO  (temporary opening pose)  --hover BMO-->  DESK
+     DESK   (his body + the mug)      --hover BMO-->  BMO
+     BMO    (super close, 2D site)    --hover off--> DESK
+     any                              --left click--> ROOM
+     ROOM   (full isometric)          --click empty--> back where you were
+
+   INTRO and DESK pan with the mouse. BMO deliberately does not: the 2D site
+   has to hold still to be clickable. */
+const VIEW_ROOM  = 'room';
+const VIEW_INTRO = 'intro';
+const VIEW_DESK  = 'desk';
+const VIEW_BMO   = 'bmo';
+let viewState = VIEW_ROOM;
+
+// Stepping BMO -> DESK is debounced so a pixel of jitter at the edge of his
+// silhouette can't flicker the camera between the two.
+const BMO_EXIT_DELAY_MS = 180;
+let bmoExitTimer = null;
+// Moving in is tested against a tight box around the screen so it takes intent;
+// staying in is tested against a looser one so the edge doesn't flicker. Both
+// are the FACE, never the body — see the VIEW_DESK case in evaluateHoverFocus.
+const FACE_ENTER_MARGIN = 0.06;
+/* Kept small on purpose. At BMO_SCREEN_DISTANCE the screen already fills ~73%
+   of the frame height, so every point of margin is expensive: at 0.28 the
+   "still on the face" box came out 114% of the viewport tall, leaving nowhere
+   to be outside it vertically and about 18px a side horizontally. */
+const FACE_EXIT_MARGIN  = 0.10;
+
+let isIntroView = false;
+
+// The pose you last clicked out of. A click in the room view puts you back.
+let savedView = null;
 
 const _bmoForward = new THREE.Vector3();
 const _bmoRight   = new THREE.Vector3();
@@ -1226,124 +1405,457 @@ function unregisterClickable(target) {
   }
 }
 
+/* Starts the BMO intro video. Split out of the click handler so the 'canplay'
+   listener can also call it when a click arrived before the video buffered. */
+function playBMOVideo() {
+  if (!tvVideo || isVideoPlaying) return;
+  pendingVideoPlay = false;
+  screenOpening = false;
+  isVideoPlaying = true;
+  // Marked on START, not on 'ended'. Bailing out with Escape half way through
+  // still counts as watched, so nobody is made to sit through the intro twice
+  // in one visit. A refresh brings it back.
+  bmoVideoWatched = true;
+  tvVideo.currentTime = 0;
+  tvVideo.muted = false;
+  tvVideo.volume = 0.8;
+  tvVideo.play().catch((err) => {
+    // Autoplay policy can still refuse unmuted playback — fall back rather
+    // than leaving BMO frozen on a click that looked like it did nothing.
+    console.warn('Video play failed, retrying muted:', err);
+    tvVideo.muted = true;
+    tvVideo.play().catch((err2) => {
+      console.warn('Muted retry also failed:', err2);
+      isVideoPlaying = false;
+    });
+  });
+}
+
+/* Single entry point for "the user asked to advance BMO". Never returns
+   silently on a not-yet-ready video — it queues the intent instead, which is
+   what made an early second click feel like it did nothing for a few seconds. */
+function requestBMOVideo() {
+  if (bmoVideoWatched) {
+    zoomToScreenThenShowStatic();
+    return;
+  }
+  if (isVideoPlaying) return;
+  if (!tvVideo || !videoReady) {
+    pendingVideoPlay = true;
+    if (window._loadBMOVideo) window._loadBMOVideo();
+    return;
+  }
+  playBMOVideo();
+}
+
 window.addEventListener('pointerdown', (event) => {
   if (!appReady) return;
 
+  // The desktop iframe owns every click while it's mounted. Without this,
+  // clicks that land just off the screen plane re-target BMO and yank the
+  // camera out from under whatever you were trying to press.
+  if (isBrowsingScreen) return;
 
+  // Don't let a stray click re-frame the camera mid-intro.
+  if (isVideoPlaying) return;
+
+  // Mid-flight into the desktop. The mount is queued on the focus completing,
+  // so a click here would cancel it and leave the screen permanently
+  // unopenable. Let the transition land; Escape still bails out.
+  if (screenOpening && !isBrowsingScreen) return;
 
   const rect = renderer.domElement.getBoundingClientRect();
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(interactionBoundingBoxes, false);
+  const selected = intersects.length > 0 ? intersects[0].object.userData.clickableTarget : null;
 
-  if (intersects.length > 0) {
-    const selected = intersects[0].object.userData.clickableTarget;
-
-    if (selected === switchMesh ||
-        selected.name === 'Object_0003_1' ||
-        selected.name === 'switch' ||
-        selected.name === 'Switch') {
-      setDayNight(!isDayMode);
-      return;
-    }
-
-    // Ukulele — play the strum sound but skip zoom/focus entirely
-    if (selected === ukulele) {
-      ukeSound.currentTime = 0;
-      ukeSound.play();
-      return;
-    }
-
-    if (selected !== selectedObject) {
-      zoomIn.volume = 0.05;
-      zoomIn.currentTime = 0;
-      zoomIn.play();
-    }
-
-    if (selected === bmoObject || selected.name === 'leftArm002_8') {
-      // If BMO is already focused, a second click on his body plays the video
-      if (isFocusedOnBMO && !isFocusingObject) {
-        if (!videoReady || !tvVideo) {
-          console.log('Video is not ready yet.');
-          return;
-        }
-        if (isVideoPlaying) {
-          console.log('Video is already playing.');
-          return;
-        }
-        if (tvVideo.paused) {
-          hasOpenedStaticScreen = false;
-          isVideoPlaying = true;
-          tvVideo.currentTime = 0;
-          tvVideo.muted = false;
-          tvVideo.volume = 0.8;
-          tvVideo.play().catch((err) => {
-            console.warn('Video play failed:', err);
-            isVideoPlaying = false;
-          });
-        }
-        return;
-      }
-      isFocusedOnBMO = true;
-      selectedObject = selected;
-      outlinePass.selectedObjects = [selected];
-      console.log('BMO focused:', selected.name);
-      if (window._loadBMOVideo) window._loadBMOVideo();
-      if (tvScreenMesh) registerClickable(tvScreenMesh);
-      focusOnObject(selected);
-      return;
-    }
-
-    if (selected === tvScreenMesh) {
-      if (!videoReady || !tvVideo) {
-        console.log('Video is not ready yet.');
-        return;
-      }
-      if (isVideoPlaying) {
-        console.log('Video is already playing.');
-        return;
-      }
-      if (tvVideo.paused) {
-        hasOpenedStaticScreen = false;
-        isVideoPlaying = true;
-        tvVideo.currentTime = 0;
-        tvVideo.muted = false;
-        tvVideo.volume = 0.8;
-        tvVideo.play().catch((err) => {
-          console.warn('Video play failed:', err);
-          isVideoPlaying = false;
-        });
-      }
-      return;
-    }
-
-    if (selected === mcbed) {
-      tipBar.innerText = isDayMode
-        ? 'Sorry, you can only sleep at night'
-        : 'You may not rest now, there are monsters nearby';
-      tipBar.style.opacity = '1';
-      if (tipBar.fadeTimeout) clearTimeout(tipBar.fadeTimeout);
-      tipBar.fadeTimeout = setTimeout(() => {
-        tipBar.style.opacity = '0';
-      }, 3000);
-    }
-
-    isFocusedOnBMO = false;
-    if (tvScreenMesh) unregisterClickable(tvScreenMesh);
-    selectedObject = selected;
-    outlinePass.selectedObjects = [selected];
-    console.log('Clicked Object Name:', selected.name, '| Object Type:', selected.type);
-    focusOnObject(selected);
-  } else {
-    isFocusedOnBMO = false;
-    if (tvScreenMesh) unregisterClickable(tvScreenMesh);
-    outlinePass.selectedObjects = [];
+  // These two act on the object without moving the camera, so they work from
+  // any view and are checked before the click-to-exit rule below.
+  if (selected && (selected === switchMesh ||
+      selected.name === 'Object_0003_1' ||
+      selected.name === 'switch' ||
+      selected.name === 'Switch')) {
+    setDayNight(!isDayMode);
+    return;
   }
+
+  if (selected && selected === ukulele) {
+    ukeSound.currentTime = 0;
+    ukeSound.play();
+    return;
+  }
+
+  // Left click anywhere is the way back to the full isometric room — the only
+  // exception being a click on BMO while you're already looking at him, which
+  // opens the desktop instead.
+  const inFocusedView = isFocusedOnBMO || hoverFocusActive || isFocusingObject || selectedObject !== null;
+  if (inFocusedView) {
+    if (isFocusedOnBMO && hoverSubjectFor(selected) === 'bmo') {
+      // The first click boots the computer (the intro video needs a real user
+      // gesture for its audio anyway). After that he is hover-only: clicking
+      // him again must not re-zoom or replay the video.
+      if (!screenMounted && !screenOpening) {
+        if (viewState !== VIEW_BMO) goToBmo();
+        requestBMOVideo();
+      }
+      return;
+    }
+    returnToRoomView();
+    return;
+  }
+
+  // From here down we're in the room view. A click on empty space toggles
+  // back to the pose you left; a click on an object focuses that object.
+  if (!selected) {
+    outlinePass.selectedObjects = [];
+    restoreSavedView();
+    return;
+  }
+
+  zoomIn.volume = 0.05;
+  zoomIn.currentTime = 0;
+  zoomIn.play();
+
+  if (hoverSubjectFor(selected) === 'bmo') {
+    goToDesk(true);
+    return;
+  }
+
+  if (selected === mcbed) {
+    tipBar.innerText = isDayMode
+      ? 'Sorry, you can only sleep at night'
+      : 'You may not rest now, there are monsters nearby';
+    tipBar.style.opacity = '1';
+    if (tipBar.fadeTimeout) clearTimeout(tipBar.fadeTimeout);
+    tipBar.fadeTimeout = setTimeout(() => {
+      tipBar.style.opacity = '0';
+    }, 3000);
+  }
+
+  pendingVideoPlay = false;
+  if (tvScreenMesh) unregisterClickable(tvScreenMesh);
+  selectedObject = selected;
+  outlinePass.selectedObjects = [selected];
+  focusOnObject(selected);
 });
 
 let pendingPointerEvent = null;
 let pointerRaycastQueued = false;
+// Last known cursor position in client space, so the hover test can be re-run
+// from the animation loop while the camera is moving under a still mouse.
+const pointerClient = { x: 0, y: 0, valid: false };
+
+/* Ray from the last known cursor position into the interaction proxies.
+   Returns the clickable target under the pointer, or null. */
+function pickAtPointer() {
+  if (!pointerClient.valid) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((pointerClient.x - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((pointerClient.y - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(interactionBoundingBoxes, false);
+  return hits.length > 0 ? hits[0].object.userData.clickableTarget : null;
+}
+
+/* Which hover-to-focus subject does this object belong to, if any? Hovering
+   ANY part of a subject counts as staying on it — BMO's body, his arm and his
+   screen are all "BMO", because once the camera is in close it's the screen
+   proxy that sits under the cursor, not the body. */
+function hoverSubjectFor(obj) {
+  if (!obj) return null;
+  if (obj === bmoObject || obj === tvScreenMesh || obj.name === 'leftArm002_8') return 'bmo';
+  if (whiteboardObject && obj === whiteboardObject) return 'whiteboard';
+  return null;
+}
+
+function playCue(sound) {
+  try {
+    sound.volume = 0.05;
+    sound.currentTime = 0;
+    const play = sound.play();
+    if (play && play.catch) play.catch(() => {});
+  } catch (_) {}
+}
+
+const _screenBoxLocal = new THREE.Box3();
+let _screenBoxReady = false;
+const _projV = new THREE.Vector3();
+
+/* Where BMO's screen lands on the viewport, in CSS pixels.
+
+   Needed because at BMO_SCREEN_DISTANCE his bounding box is bigger than the
+   whole frame — a raycast hits him no matter where the cursor is, so "hovering
+   off BMO" is not something the picker can answer. The screen's projected rect
+   is what the user actually sees, so that's what we test against. */
+function screenRectOnViewport() {
+  if (!tvScreenMesh) return null;
+  if (!_screenBoxReady) {
+    _screenBoxLocal.setFromObject(tvScreenMesh);
+    _screenBoxReady = true;
+  }
+  const b = _screenBoxLocal;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < 8; i++) {
+    _projV.set(i & 1 ? b.max.x : b.min.x,
+               i & 2 ? b.max.y : b.min.y,
+               i & 4 ? b.max.z : b.min.z).project(camera);
+    const sx = (_projV.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-_projV.y * 0.5 + 0.5) * window.innerHeight;
+    if (sx < minX) minX = sx;
+    if (sx > maxX) maxX = sx;
+    if (sy < minY) minY = sy;
+    if (sy > maxY) maxY = sy;
+  }
+  return { left: minX, right: maxX, top: minY, bottom: maxY };
+}
+
+/* Is the cursor on the screen (plus a forgiving margin)? */
+function isPointerOverScreen(margin = 0.18) {
+  if (!pointerClient.valid) return false;
+  const r = screenRectOnViewport();
+  if (!r) return false;
+  const mx = (r.right - r.left) * margin;
+  const my = (r.bottom - r.top) * margin;
+  return pointerClient.x >= r.left - mx && pointerClient.x <= r.right + mx &&
+         pointerClient.y >= r.top  - my && pointerClient.y <= r.bottom + my;
+}
+
+function clearBmoExitTimer() {
+  if (bmoExitTimer) { clearTimeout(bmoExitTimer); bmoExitTimer = null; }
+}
+
+/* DESK — BMO's body and the mug. Reached by hovering him from the opening
+   view, and by hovering off him from the 2D site. */
+function goToDesk(zoomingIn) {
+  clearBmoExitTimer();
+  if (isBrowsingScreen) exitBrowseMode();
+
+  viewState = VIEW_DESK;
+  isIntroView = false;
+  isFocusedOnBMO = true;
+  hoverFocusActive = false;
+  hoverFocusSubject = 'bmo';
+  selectedObject = null;
+  screenOpening = false;
+  pendingVideoPlay = false;
+  onFocusComplete = null;
+  outlinePass.selectedObjects = [];
+
+  if (window._loadBMOVideo) window._loadBMOVideo();
+  if (tvScreenMesh) registerClickable(tvScreenMesh);
+  playCue(zoomingIn ? zoomIn : zoomOut);
+  setAudioPerspective('speaker', 0.9, SPEAKER_LEVEL_DESK);
+  focusOnBmoAxis(BMO_INTRO_DISTANCE);
+}
+
+/* BMO — super close on the screen with the 2D site live on it. requestBMOVideo
+   plays the intro the first time and goes straight in on every later visit. */
+function goToBmo() {
+  if (viewState === VIEW_BMO) return;
+  clearBmoExitTimer();
+
+  viewState = VIEW_BMO;
+  isIntroView = false;
+  isFocusedOnBMO = true;
+  hoverFocusActive = false;
+  hoverFocusSubject = 'bmo';
+  selectedObject = null;
+  outlinePass.selectedObjects = [];
+
+  if (window._loadBMOVideo) window._loadBMOVideo();
+  if (tvScreenMesh) registerClickable(tvScreenMesh);
+  playCue(zoomIn);
+  setAudioPerspective('direct');
+
+  focusOnBmoAxis(BMO_SCREEN_DISTANCE);
+  // Already booted: hand pointer events back on arrival and you land exactly
+  // where you left the site. Not booted yet: this just moves in close, and the
+  // first click boots it — hovering must never start the intro video.
+  if (screenMounted) onFocusComplete = enterBrowseMode;
+}
+
+/* The whiteboard and anything else with a focus preset. BMO has his own two
+   states above, so this never handles him. */
+function enterHoverFocus(target, subject) {
+  hoverFocusActive = true;
+  isIntroView = false;
+  hoverFocusSubject = subject;
+  selectedObject = target;
+  outlinePass.selectedObjects = [];
+  playCue(zoomIn);
+  focusOnObject(target);
+}
+
+/* Remember the pose being left, so the next click in the room view puts you
+   back where you were instead of making you re-find it. */
+function captureSavedView() {
+  savedView = {
+    camera:  focusCameraPosition.clone(),
+    target:  focusControlsTarget.clone(),
+    // A 2D-site view is saved as the desk behind it: coming back should put
+    // you on the desk, not straight back into the site.
+    state:   viewState === VIEW_BMO ? VIEW_DESK : viewState,
+    bmo:     isFocusedOnBMO,
+    intro:   isIntroView,
+    selected: selectedObject,
+    subject: hoverFocusSubject,
+  };
+}
+
+/* Fly back to the pose captured on the way out. Returns false if there isn't
+   one yet, so the caller can fall through to its normal behaviour. */
+function restoreSavedView() {
+  if (!savedView || isEscapeAnimating) return false;
+
+  // A saved BMO view is always restored as the desk framing, never the 2D
+  // site — the site is something you hover into, not something you land in.
+  if (savedView.state === VIEW_DESK) {
+    goToDesk(true);
+    return true;
+  }
+
+  focusCameraPosition.copy(savedView.camera);
+  focusControlsTarget.copy(savedView.target);
+  viewState        = savedView.state;
+  isFocusedOnBMO   = savedView.bmo;
+  isIntroView      = savedView.intro;
+  selectedObject   = savedView.selected;
+  hoverFocusSubject = savedView.subject;
+  hoverFocusActive = false;
+  hoverRearmNeeded = true;
+  outlinePass.selectedObjects = [];
+
+  if (savedView.bmo) {
+    if (window._loadBMOVideo) window._loadBMOVideo();
+    if (tvScreenMesh) registerClickable(tvScreenMesh);
+  }
+
+  try {
+    zoomIn.volume = 0.05;
+    zoomIn.currentTime = 0;
+    const play = zoomIn.play();
+    if (play && play.catch) play.catch(() => {});
+  } catch (_) {}
+
+  isEscapeAnimating = false;
+  isFocusingObject = true;
+  lastFocusTime = performance.now();
+  focusAnimStartTime = performance.now();
+  controls.enabled = false;
+  beginCameraTransition();
+  return true;
+}
+
+/* The one way back to the full isometric room: a left click anywhere that
+   isn't what you're looking at, or Escape. Hovering away deliberately does
+   NOT do this any more — the camera stays where you put it. */
+function returnToRoomView() {
+  if (isEscapeAnimating) return;
+  // Hand pointer events back to the canvas, but leave the site mounted so it
+  // keeps its state for the next visit.
+  if (isBrowsingScreen) exitBrowseMode();
+
+  const wasFocused = isFocusedOnBMO || hoverFocusActive || isFocusingObject || selectedObject !== null;
+  if (wasFocused) {
+    captureSavedView();
+    try {
+      zoomOut.currentTime = 0;
+      zoomOut.volume = 0.05;
+      const play = zoomOut.play();
+      if (play && play.catch) play.catch(() => {});
+    } catch (_) {}
+  }
+
+  hoverFocusActive = false;
+  hoverFocusSubject = null;
+  // The cursor is probably still sitting on whatever we just left.
+  hoverRearmNeeded = true;
+  clearBmoExitTimer();
+  viewState = VIEW_ROOM;
+  isFocusedOnBMO = false;
+  isIntroView = false;
+  // Critical: this latch is what stops zoomToScreenThenShowStatic() running
+  // twice. If we leave without the desktop having mounted, it has to come back
+  // down — otherwise every future attempt early-returns and BMO's screen can
+  // never be opened again for the rest of the session.
+  screenOpening = false;
+  isFocusingObject = false;
+  pendingVideoPlay = false;
+  onFocusComplete = null;
+  selectedObject = null;
+  outlinePass.selectedObjects = [];
+  if (tvScreenMesh) unregisterClickable(tvScreenMesh);
+
+  setAudioPerspective('speaker');
+
+  isEscapeAnimating = true;
+  lastEscapeTime = performance.now();
+  controls.enabled = false;
+  animateEscape();
+}
+
+/* Hover drives the INTRO -> DESK -> BMO ladder, and steps back down from BMO
+   when the pointer leaves him. Everything else is a click. */
+function evaluateHoverFocus(hovered) {
+  if (!supportsHoverFocus || !appReady) return;
+  // Never fight a transition that's already running, a playing video, the
+  // help panel, or an active drag.
+  if (isVideoPlaying || pendingVideoPlay || helpOpen || userIsInteracting) return;
+  if (isEscapeAnimating || isFocusingObject) return;
+
+  if (hovered === undefined) hovered = pickAtPointer();
+  const onBmo = hoverSubjectFor(hovered) === 'bmo';
+
+  switch (viewState) {
+    case VIEW_INTRO:
+      // The opening pose steps in to the desk.
+      if (onBmo) goToDesk(true);
+      break;
+
+    case VIEW_DESK:
+      /* The FACE steps in to the 2D site — his body does not.
+
+         This used to trigger anywhere on BMO, which fought the stay test in
+         VIEW_BMO below (that one has always measured the screen rect). Hover
+         his body and you'd move in, fail the stay test 180ms later, and get
+         dropped straight back to the desk — the "it snaps to the body but
+         doesn't zoom, then zooms when I move again" behaviour. Entry and stay
+         now ask the same question, with hysteresis between them. */
+      if (isPointerOverScreen(FACE_ENTER_MARGIN)) goToBmo();
+      break;
+
+    case VIEW_BMO:
+      /* Deliberately not `onBmo`: this close, his bounding box covers the
+         whole viewport, so the picker always says yes and the step back could
+         never fire.
+
+         Once the site is mounted the iframe covers the screen exactly and
+         swallows its own pointermove, so an event arriving here already means
+         the cursor has left it — exact, and nothing to tune. Before boot there
+         is no overlay, so fall back to the projected rect. */
+      if (!isBrowsingScreen && isPointerOverScreen(FACE_EXIT_MARGIN)) {
+        clearBmoExitTimer();
+      } else if (!bmoExitTimer) {
+        bmoExitTimer = setTimeout(() => {
+          bmoExitTimer = null;
+          if (viewState === VIEW_BMO) goToDesk(false);
+        }, BMO_EXIT_DELAY_MS);
+      }
+      break;
+
+    case VIEW_ROOM: {
+      const subject = hoverSubjectFor(hovered);
+      // Clear of everything: re-arm, so leaving and coming back works.
+      if (!subject) { hoverRearmNeeded = false; break; }
+      if (hoverRearmNeeded || selectedObject) break;
+      if (subject === 'bmo') goToDesk(true);
+      else enterHoverFocus(hovered, subject);
+      break;
+    }
+  }
+}
 
 function processPointerHover() {
   pointerRaycastQueued = false;
@@ -1351,19 +1863,44 @@ function processPointerHover() {
   pendingPointerEvent = null;
   if (!event) return;
 
-const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(interactionBoundingBoxes, false);
+  pointerClient.x = event.clientX;
+  pointerClient.y = event.clientY;
+  pointerClient.valid = true;
 
-  if (intersects.length > 0) {
+  // Browsing the desktop: no halos, but the hover test still runs — leaving
+  // BMO is how you step back out to the desk view now.
+  if (isBrowsingScreen) {
+    document.body.style.cursor = 'default';
+    outlinePass.selectedObjects = [];
+    evaluateHoverFocus();
+    return;
+  }
+
+  const hovered = pickAtPointer();
+
+  // In the opening and desk views a left click anywhere pulls back to the full
+  // room, so the whole viewport is clickable — say so with the cursor.
+  const clickExitsToRoom = viewState === VIEW_INTRO || viewState === VIEW_DESK;
+
+  if (hovered || clickExitsToRoom) {
     document.body.style.cursor = 'pointer';
-    outlinePass.selectedObjects = [intersects[0].object.userData.clickableTarget];
+    // Once you're zoomed into BMO the outline just rings the thing you're
+    // looking at, so keep the cursor affordance but drop the halo.
+    /* Never halo a hover-focus subject. The outline means "click me", and BMO
+       and the whiteboard mean "hover me" — the camera moves on its own, so the
+       halo is redundant. It used to be invisible by accident: hovering BMO set
+       isFocusedOnBMO in the same frame, which suppressed it. Now that
+       hoverRearmNeeded can hold the transition off (so returning to the room
+       with the cursor still on him doesn't dive straight back in), there are
+       frames where he is hovered but not focused — and the halo showed. */
+    const noHalo = !hovered || hoverSubjectFor(hovered) || isFocusedOnBMO || hoverFocusActive;
+    outlinePass.selectedObjects = noHalo ? [] : [hovered];
   } else {
     document.body.style.cursor = 'default';
     outlinePass.selectedObjects = [];
   }
+
+  evaluateHoverFocus(hovered);
 }
 
 window.addEventListener('pointermove', (event) => {
@@ -1374,12 +1911,16 @@ window.addEventListener('pointermove', (event) => {
   }
 });
 
+window.addEventListener('pointerleave', () => {
+  pointerClient.valid = false;
+});
+
 const loader = new GLTFLoader();
 
 // please never remove, this allows it to even load in browsers
 loader.setDRACOLoader(dracoLoader);
 
-const SCENE_GLB = '/scene-1k.glb';
+const SCENE_GLB = '/scene-revised.glb';
 
 function startSceneLoad() {
   console.log(`[load] requesting ${SCENE_GLB}`);
@@ -1581,10 +2122,16 @@ function startSceneLoad() {
 
     ukulele = model.getObjectByName('ukulele');
     if (ukulele) registerClickable(ukulele);
-    const bmoMesh   = model.getObjectByName('leftArm002_8');
+    // bmo_body's mesh (leftArm.002) has 13 primitives, so GLTFLoader turns it
+    // into a Group with children leftArm002_0..12. Targeting leftArm002_8 got
+    // a single slice, so the click proxy only covered part of him and hits
+    // were hit-or-miss. Register the whole group instead.
+    const bmoMesh   = model.getObjectByName('bmo_body')
+                   || model.getObjectByName('leftArm002_8');
     bmoObject = bmoMesh;
     const whiteboard = model.getObjectByName('Whiteboard');
     whiteboardShadow = whiteboard;
+    whiteboardObject = whiteboard;
   
 
     if (whiteboardShadow) {
@@ -1700,8 +2247,9 @@ function startSceneLoad() {
       video.addEventListener('ended', () => {
         console.log('Video ended. Changing screen color, then zooming...');
         isVideoPlaying = false;
+        bmoVideoWatched = true;
         setBMOScreenSolidColor('#c9f4df');
-        setTimeout(() => { zoomToScreenThenShowStatic(); }, 300);
+        zoomToScreenThenShowStatic();
       });
 
       video.addEventListener('pause', () => {
@@ -1754,6 +2302,10 @@ function startSceneLoad() {
 
       video.addEventListener('canplay', () => {
         videoReady = true;
+        // Someone clicked BMO before the file was buffered — honour it now
+        // rather than making them click a third time.
+        if (pendingVideoPlay && isFocusedOnBMO) playBMOVideo();
+        pendingVideoPlay = false;
       });
 
       video.addEventListener('error', () => {
@@ -1774,11 +2326,261 @@ function startSceneLoad() {
       function loadVideo() {
         if (videoLoadStarted) return;
         videoLoadStarted = true;
+        video.preload = 'auto';
+        // Seek once metadata exists. Setting currentTime immediately after
+        // load() can be dropped, since readyState is still 0 at that point.
+        video.addEventListener('loadedmetadata', () => {
+          try { video.currentTime = 0.066; } catch (_) {}
+        }, { once: true });
         video.load();
-        video.currentTime = 0.066;
       }
       window._loadBMOVideo = loadVideo;
+
+      // Warm the first frame up front so BMO's face is visible before he's
+      // clicked. This only seeks to a paused frame — the 'seeked' handler
+      // above swaps in videoTex, and playback still only starts on click.
+      // Deferred to idle so the fetch/decode doesn't compete with shader
+      // compilation during the first frames.
+      // Timeout kept short: the old 3s ceiling meant an early click on BMO
+      // hit a video that hadn't even started fetching.
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => loadVideo(), { timeout: 600 });
+      } else {
+        setTimeout(loadVideo, 400);
+      }
+
       updateTV = null;
+    }
+
+    /* --- Alarm clock (Cube.026): the user's real local time --------------
+       The clock imports as a group of two primitives — a near-black body and
+       a small faceplate raised on one side. We find the faceplate by geometry
+       rather than by name, because GLTFLoader names primitives after the glTF
+       *mesh* ("Cube.034" here, not the node), and appends _1, _2... on
+       collision — so those names shift whenever the export changes. A thin
+       unlit plane sits just in front of the faceplate carrying the digits. */
+    const clockRoot = model.getObjectByName('Cube026') || (() => {
+      let found = null;
+      model.traverse(o => { if (!found && /^cube[._ ]?026$/i.test(o.name || '')) found = o; });
+      return found;
+    })();
+
+    if (!clockRoot) {
+      console.warn('[clock] No object named "Cube026" found — skipping the time display.');
+    } else {
+      // Faceplate = the child whose local geometry starts furthest along +X,
+      // i.e. the panel sitting proud of the body.
+      let panel = null;
+      let bestMinX = -Infinity;
+      clockRoot.traverse((o) => {
+        if (!o.isMesh || !o.geometry) return;
+        o.geometry.computeBoundingBox();
+        const minX = o.geometry.boundingBox.min.x;
+        if (minX > bestMinX) { bestMinX = minX; panel = o; }
+      });
+
+      if (!panel) {
+        console.warn('[clock] "Cube026" has no mesh children — skipping the time display.');
+      } else {
+        model.updateWorldMatrix(true, true);
+        const panelBox  = new THREE.Box3().setFromObject(panel);
+        const panelSize = panelBox.getSize(new THREE.Vector3());
+        const panelMid  = panelBox.getCenter(new THREE.Vector3());
+        const rootMid   = new THREE.Box3().setFromObject(clockRoot).getCenter(new THREE.Vector3());
+
+        // Thinnest axis is the one the display faces along; the sign is
+        // whichever way the faceplate sits relative to the body's centre.
+        const thin = panelSize.x <= panelSize.z ? 'x' : 'z';
+        const wide = thin === 'x' ? 'z' : 'x';
+        const dir  = Math.sign(panelMid[thin] - rootMid[thin]) || 1;
+
+        const planeW = panelSize[wide] * 0.94;
+        const planeH = panelSize.y * 0.90;
+
+        const TEX_W = 512;
+        const TEX_H = Math.max(64, Math.round(TEX_W * (planeH / planeW)));
+
+        const cvs = document.createElement('canvas');
+        cvs.width = TEX_W;
+        cvs.height = TEX_H;
+        const ctx = cvs.getContext('2d');
+
+        // Seven-segment layout:  aaa / f b / ggg / e c / ddd
+        const SEG_MAP = {
+          '0': 'abcdef', '1': 'bc',     '2': 'abdeg',  '3': 'abcdg', '4': 'bcfg',
+          '5': 'acdfg',  '6': 'acdefg', '7': 'abc',    '8': 'abcdefg', '9': 'abcdfg',
+          ' ': ''
+        };
+
+        const fillSeg = (x, y, w, h, r) => {
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+          else ctx.rect(x, y, w, h);
+          ctx.fill();
+        };
+
+        function drawDigit(ch, x, y, w, h) {
+          const on = SEG_MAP[ch] || '';
+          const t = w * 0.19;
+          const half = h / 2;
+          const r = t * 0.35;
+          const segs = {
+            a: [x + t * 0.5, y,                    w - t,      t],
+            b: [x + w - t,   y + t * 0.5,          t,          half - t],
+            c: [x + w - t,   y + half + t * 0.5,   t,          half - t],
+            d: [x + t * 0.5, y + h - t,            w - t,      t],
+            e: [x,           y + half + t * 0.5,   t,          half - t],
+            f: [x,           y + t * 0.5,          t,          half - t],
+            g: [x + t * 0.5, y + half - t * 0.5,   w - t,      t],
+          };
+          for (const key in segs) {
+            if (on.indexOf(key) === -1) continue;
+            const [sx, sy, sw, sh] = segs[key];
+            fillSeg(sx, sy, sw, sh, r);
+          }
+        }
+
+        // Respect the viewer's locale rather than assuming 12-hour.
+        const CLOCK_12H = (() => {
+          try {
+            return new Intl.DateTimeFormat(undefined, { hour: 'numeric' })
+              .resolvedOptions().hour12 !== false;
+          } catch (_) { return true; }
+        })();
+
+        let lastSignature = '';
+
+        function drawClock(force) {
+          const now = new Date();
+          let hours = now.getHours();
+          let suffix = '';
+          if (CLOCK_12H) {
+            suffix = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+          }
+          // Leading zero is blanked on a 12-hour clock, kept on a 24-hour one.
+          const hStr = CLOCK_12H
+            ? (hours < 10 ? ' ' + hours : String(hours))
+            : String(hours).padStart(2, '0');
+          const mStr = String(now.getMinutes()).padStart(2, '0');
+          const colonOn = now.getSeconds() % 2 === 0;
+
+          const signature = hStr + mStr + suffix + (colonOn ? '1' : '0');
+          if (!force && signature === lastSignature) return;   // no texture upload
+          lastSignature = signature;
+
+          // Reserve a column on the right for AM/PM, otherwise it sits on top
+          // of the last digit.
+          const suffixCol = suffix ? TEX_W * 0.15 : 0;
+          const dh = TEX_H * 0.56;
+          const dw = dh * 0.54;
+          const gap = dw * 0.18;
+          const colonW = dw * 0.32;
+          const totalW = dw * 4 + gap * 4 + colonW;
+          let x = (TEX_W - suffixCol - totalW) / 2;
+          const y = (TEX_H - dh) / 2;
+
+          ctx.clearRect(0, 0, TEX_W, TEX_H);
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+          ctx.shadowBlur = TEX_H * 0.05;
+
+          drawDigit(hStr[0], x, y, dw, dh); x += dw + gap;
+          drawDigit(hStr[1], x, y, dw, dh); x += dw + gap;
+
+          if (colonOn) {
+            const cw = colonW * 0.55;
+            fillSeg(x + (colonW - cw) / 2, y + dh * 0.28 - cw / 2, cw, cw, cw * 0.3);
+            fillSeg(x + (colonW - cw) / 2, y + dh * 0.72 - cw / 2, cw, cw, cw * 0.3);
+          }
+          x += colonW + gap;
+
+          drawDigit(mStr[0], x, y, dw, dh); x += dw + gap;
+          drawDigit(mStr[1], x, y, dw, dh);
+
+          if (suffix) {
+            ctx.shadowBlur = TEX_H * 0.03;
+            ctx.font = `600 ${Math.round(TEX_H * 0.15)}px "Helvetica Neue", Arial, sans-serif`;
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(suffix, TEX_W - TEX_W * 0.035, TEX_H * 0.5);
+          }
+
+          clockTex.needsUpdate = true;
+        }
+
+        const clockTex = new THREE.CanvasTexture(cvs);
+        clockTex.colorSpace      = THREE.SRGBColorSpace;
+        clockTex.minFilter       = THREE.LinearFilter;
+        clockTex.magFilter       = THREE.LinearFilter;
+        clockTex.generateMipmaps = false;
+        clockTex.anisotropy      = renderer.capabilities.getMaxAnisotropy();
+
+        const clockMat = new THREE.MeshBasicMaterial({
+          map: clockTex,
+          transparent: true,
+          toneMapped: false,
+          depthWrite: false,
+        });
+        // Above 1.0 on purpose: the digits are drawn white and tinted here, so
+        // they clear the bloom pass's 0.65 luminance threshold and pick up the
+        // glow while still reading as amber rather than washing out to white.
+        clockMat.color = new THREE.Color(1.9, 0.55, 0.30);
+
+        const clockPlane = new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), clockMat);
+        clockPlane.position.copy(panelMid);
+        // Sit just proud of the faceplate so it can't z-fight with it.
+        clockPlane.position[thin] = (dir > 0 ? panelBox.max[thin] : panelBox.min[thin]) + dir * 0.0015;
+        clockPlane.rotation.y = thin === 'x'
+          ? (dir > 0 ? Math.PI / 2 : -Math.PI / 2)
+          : (dir > 0 ? 0 : Math.PI);
+        clockPlane.renderOrder = 2;
+        clockPlane.castShadow = false;
+        clockPlane.receiveShadow = false;
+
+        /* Slide the display along its own face. Positive = the viewer's LEFT.
+           The face normal crossed with world up gives that direction for any
+           orientation the clock ends up in (for this +X-facing panel it works
+           out to world +Z). Tune it live with window._clock.nudge(v) and put
+           the value you settle on here. */
+        const CLOCK_NUDGE = 0.035;
+        const clockNormal = new THREE.Vector3();
+        clockNormal[thin] = dir;
+        const clockLeft = clockNormal.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+        const clockBasePos = clockPlane.position.clone();
+        const applyClockNudge = (v) => {
+          clockPlane.position.copy(clockBasePos).addScaledVector(clockLeft, v);
+        };
+        applyClockNudge(CLOCK_NUDGE);
+
+        scene.add(clockPlane);
+
+        drawClock(true);
+
+        // Polled a few times a second; drawClock only touches the texture when
+        // the displayed string actually changes (twice a second, for the blink).
+        let lastClockPoll = 0;
+        updateClock = function () {
+          const t = performance.now();
+          if (t - lastClockPoll < 250) return;
+          lastClockPoll = t;
+          drawClock(false);
+        };
+
+        window._clock = {
+          plane: clockPlane,
+          panel,
+          redraw: () => drawClock(true),
+          // Absolute, not cumulative — call it repeatedly to dial it in.
+          nudge: (v) => {
+            applyClockNudge(v);
+            console.log(`[clock] nudge ${v} — keep it by setting CLOCK_NUDGE = ${v} in main.js`);
+          },
+        };
+        console.log(`[clock] Time display attached to "${panel.name}" ` +
+                    `(${planeW.toFixed(3)} x ${planeH.toFixed(3)}, facing ${dir > 0 ? '+' : '-'}${thin}, ` +
+                    `${CLOCK_12H ? '12h' : '24h'})`);
+      }
     }
 
     const leftLeg =
@@ -1824,14 +2626,37 @@ function startSceneLoad() {
     const size = box.getSize(new THREE.Vector3()).length();
     const center = box.getCenter(new THREE.Vector3());
 
-    camera.position.copy(center.clone().add(new THREE.Vector3(size*1.1, size*0.4, size*1.1)));
-    controls.target.copy(center);
     controls.maxDistance = size * 1.8;
-    camera.lookAt(center);
+
+    // The DEFAULT view is the full isometric room. It is what a left click
+    // anywhere (or Escape) returns to — but it is not where the site opens.
+    defaultCameraPosition.copy(center.clone().add(new THREE.Vector3(size*1.1, size*0.4, size*1.1)));
+    defaultControlsTarget.copy(center);
+
+    /* The site opens on BMO's desk instead. This is deliberately expressed as
+       a BMO focus rather than as its own special case: that one flag gives us
+       the mouse-pan in the render loop, the click-to-open-the-desktop branch
+       in the click handler, and the click-anywhere-to-leave rule, with no
+       parallel code path to keep in sync. */
+    focusCameraPosition.set(4.780, 2.841, -0.228);
+    focusControlsTarget.set(-0.056, 2.599, -0.265);
+    camera.position.copy(focusCameraPosition);
+    controls.target.copy(focusControlsTarget);
+    camera.lookAt(controls.target);
+    // This pose sits within a whisker of the room-view polar limit, so free
+    // the clamp before controls.update() gets a chance to shove it.
+    freeOrbitLimits(true);
     controls.update();
 
-    defaultCameraPosition.copy(camera.position);
-    defaultControlsTarget.copy(controls.target);
+    isFocusedOnBMO = true;
+    isIntroView = true;
+    viewState = VIEW_INTRO;
+    controls.enabled = false;
+    lastPanTime = performance.now();
+    // Same preparation a click on BMO does, so the first click opens the
+    // desktop rather than having to set this up first.
+    if (window._loadBMOVideo) window._loadBMOVideo();
+    if (tvScreenMesh) registerClickable(tvScreenMesh);
 
     dismissLoadingScreen();
     dracoLoader.dispose();
@@ -1885,30 +2710,91 @@ fpsDisplay.textContent = 'FPS: --';
 let fpsFrameCount = 0;
 let fpsLastTime = performance.now();
 
+// --- Adaptive performance ---------------------------------------------------
+// This used to average FPS over the first 3 seconds of PAGE LIFE and remove
+// the bloom pass outright if it came in under 45. Those 3 seconds are the GLB
+// fetch, the DRACO decode, shader compilation and the first texture uploads —
+// on a cold load the average lands under 45 for reasons that say nothing about
+// how fast the GPU is, and BMO's screen lost its glow for the whole session. A
+// warm reload measured an already-cached scene, cleared the bar, and kept the
+// bloom. That's why the glow came and went between loads.
+//
+// Now the sample waits for the scene to be up and warm, throws out hitch
+// frames, refuses to measure a backgrounded tab, and steps quality down in
+// stages so bloom is the LAST thing dropped rather than the first.
 let perfMode = false;
-let perfSampleFrames = 0;
-let perfSampleStart  = performance.now();
-let perfModeChecked  = false;
+let perfStage = 0;              // 0 = full, 1 = reduced render scale, 2 = no bloom
+let perfSamplingDone = false;
+let perfWarmupStart = 0;
+let perfLastFrame   = 0;
+let perfFrames      = 0;
+let perfElapsed     = 0;        // ms of non-hitch frame time
+const PERF_WARMUP_MS = 1200;    // let shader compilation and first paints settle
+const PERF_SAMPLE_MS = 3000;    // measure over this much clean frame time
+const PERF_HITCH_MS  = 100;     // a frame longer than this is not a GPU verdict
 
-function activatePerfMode() {
-  if (perfMode) return;
-  perfMode = true;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
-  composer.removePass(bloomPass);
-  fpsDisplay.title = 'performance mode active (bloom off)';
-  console.log('[perf] Low FPS detected — switched to performance mode (bloom removed, pixel ratio 0.75)');
+function resetPerfSample() {
+  perfWarmupStart = 0;
+  perfLastFrame = 0;
+  perfFrames = 0;
+  perfElapsed = 0;
 }
 
-function checkAdaptivePerf() {
-  if (perfModeChecked) return;
-  perfSampleFrames++;
-  const elapsed = performance.now() - perfSampleStart;
-  if (elapsed >= 3000) {
-    perfModeChecked = true;
-    const avgFps = (perfSampleFrames * 1000) / elapsed;
-    console.log(`[perf] Avg FPS over first 3s: ${avgFps.toFixed(1)}`);
-    if (avgFps < 45) activatePerfMode();
+/* Stage 1: render fewer pixels, keep the look. */
+function reduceRenderScale() {
+  perfMode = true;
+  perfStage = 1;
+  const scale = Math.min(window.devicePixelRatio, 1.0) * 0.75;
+  renderer.setPixelRatio(scale);
+  composer.setPixelRatio(scale);
+  bloomPass.setSize(Math.floor(window.innerWidth / 3), Math.floor(window.innerHeight / 3));
+  fpsDisplay.title = 'performance mode: reduced render scale (bloom kept)';
+  console.log(`[perf] Low FPS — render scale dropped to ${scale.toFixed(2)}, bloom kept`);
+}
+
+/* Stage 2: last resort, and only for hardware that stayed slow even at the
+   reduced render scale. */
+function disableBloom() {
+  perfMode = true;
+  perfStage = 2;
+  composer.removePass(bloomPass);
+  fpsDisplay.title = 'performance mode: bloom off';
+  console.log('[perf] Still slow after the render-scale drop — bloom removed');
+}
+
+function checkAdaptivePerf(now) {
+  if (perfSamplingDone) return;
+
+  // Nothing worth measuring until the scene is actually on screen. A hidden
+  // tab throttles requestAnimationFrame to a crawl, which is not a slow GPU
+  // either — that alone used to be enough to kill the glow.
+  if (!appReady || document.hidden) { resetPerfSample(); return; }
+
+  if (!perfWarmupStart) { perfWarmupStart = now; perfLastFrame = now; return; }
+  if (now - perfWarmupStart < PERF_WARMUP_MS) { perfLastFrame = now; return; }
+
+  const frameMs = now - perfLastFrame;
+  perfLastFrame = now;
+  // Hitch: a stall from a late texture upload, GC, or the tab being away.
+  // Counting it would let one 300ms frame decide the whole verdict.
+  if (frameMs <= 0 || frameMs > PERF_HITCH_MS) return;
+
+  perfFrames++;
+  perfElapsed += frameMs;
+  if (perfElapsed < PERF_SAMPLE_MS) return;
+
+  const avgFps = (perfFrames * 1000) / perfElapsed;
+  console.log(`[perf] Steady-state avg FPS (stage ${perfStage}): ${avgFps.toFixed(1)}`);
+
+  if (perfStage === 0) {
+    if (avgFps >= 45) { perfSamplingDone = true; return; }
+    reduceRenderScale();
+    resetPerfSample();   // re-measure before touching the bloom
+    return;
   }
+
+  perfSamplingDone = true;
+  if (avgFps < 40) disableBloom();
 }
 
 function updateFPS() {
@@ -1928,9 +2814,10 @@ function updateFPS() {
 function animate() {
   requestAnimationFrame(animate);
   updateFPS();
-  checkAdaptivePerf();
+  checkAdaptivePerf(performance.now());
 
   if (updateTV) updateTV();
+  if (updateClock) updateClock();
 
   if (paperMaterial) {
     paperMaterial.uniforms.uTime.value = performance.now() * 0.001;
@@ -1985,43 +2872,45 @@ function animate() {
     rightLeg.rotation.set(baseRotR.x, baseRotR.y - angle, baseRotR.z);
   }
 
+  // Pan first, so the focus flight below aims at the panned goal too.
+  const framePanNow = performance.now();
+  const framePanDt = Math.min((framePanNow - lastPanTime) / 1000, 0.1);
+  lastPanTime = framePanNow;
+  if (isFocusedOnBMO && !isEscapeAnimating) {
+    updateBmoPan(framePanDt);
+  } else {
+    bmoParallaxCurrent.set(0, 0, 0);
+    bmoParallaxTarget.set(0, 0, 0);
+    bmoParallaxVelocity.set(0, 0, 0);
+  }
+
   animateObjectFocus();
 
   if (isFocusedOnBMO && !isFocusingObject && !isEscapeAnimating) {
     controls.enabled = false;
-    const dt = Math.min(1 / 30, 1 / 60);
-    _bmoForward.subVectors(focusControlsTarget, focusCameraPosition).normalize();
-    _bmoRight.crossVectors(_bmoForward, camera.up).normalize();
-    _bmoUp.crossVectors(_bmoRight, _bmoForward).normalize();
-
-    bmoParallaxTarget.copy(_bmoRight).multiplyScalar(mouseNDC.x * BMO_PARALLAX_STRENGTH)
-      .addScaledVector(_bmoUp, mouseNDC.y * BMO_PARALLAX_STRENGTH * 0.6);
-
-    const ax = BMO_PARALLAX_STIFFNESS * (bmoParallaxTarget.x - bmoParallaxCurrent.x) - BMO_PARALLAX_DAMPING * bmoParallaxVelocity.x;
-    const ay = BMO_PARALLAX_STIFFNESS * (bmoParallaxTarget.y - bmoParallaxCurrent.y) - BMO_PARALLAX_DAMPING * bmoParallaxVelocity.y;
-    const az = BMO_PARALLAX_STIFFNESS * (bmoParallaxTarget.z - bmoParallaxCurrent.z) - BMO_PARALLAX_DAMPING * bmoParallaxVelocity.z;
-    bmoParallaxVelocity.x += ax * dt;
-    bmoParallaxVelocity.y += ay * dt;
-    bmoParallaxVelocity.z += az * dt;
-    bmoParallaxCurrent.x  += bmoParallaxVelocity.x * dt;
-    bmoParallaxCurrent.y  += bmoParallaxVelocity.y * dt;
-    bmoParallaxCurrent.z  += bmoParallaxVelocity.z * dt;
-
-    camera.position.copy(focusCameraPosition).add(bmoParallaxCurrent);
-    camera.lookAt(focusControlsTarget);
+    // Damped rather than hard-set. animateObjectFocus flies to the SAME panned
+    // goal, so when it hands over there is no discontinuity — that handover
+    // used to land the camera on the un-panned pose and then slide it to meet
+    // the cursor, which is what read as a snap on the way in.
+    camera.position.x = THREE.MathUtils.damp(camera.position.x, focusCameraPosition.x + bmoParallaxCurrent.x, BMO_HOLD_SMOOTHNESS, framePanDt);
+    camera.position.y = THREE.MathUtils.damp(camera.position.y, focusCameraPosition.y + bmoParallaxCurrent.y, BMO_HOLD_SMOOTHNESS, framePanDt);
+    camera.position.z = THREE.MathUtils.damp(camera.position.z, focusCameraPosition.z + bmoParallaxCurrent.z, BMO_HOLD_SMOOTHNESS, framePanDt);
+    _panLookAt.copy(focusControlsTarget).add(bmoParallaxCurrent);
+    camera.lookAt(_panLookAt);
   } else {
-    if (!isFocusedOnBMO) {
-      bmoParallaxCurrent.set(0, 0, 0);
-      bmoParallaxVelocity.set(0, 0, 0);
-    }
     if (!isEscapeAnimating && !isFocusingObject) controls.update();
   }
 
   const transitioning = isFocusingObject || isEscapeAnimating;
 
-  outlinePass.enabled = !transitioning && outlinePass.selectedObjects.length > 0;
+  // Outlines are off entirely once you're zoomed into BMO or reading the
+  // desktop — a glowing halo around the screen you're trying to read.
+  outlinePass.enabled = !transitioning && !isFocusedOnBMO && !isBrowsingScreen &&
+    outlinePass.selectedObjects.length > 0;
 
   composer.render();
+  // Only costs anything while the iframe is actually mounted.
+  if (isBrowsingScreen) layoutScreenOverlay();
 }
 animate();
 
@@ -2040,8 +2929,10 @@ function animateEscape() {
   controls.target.y = THREE.MathUtils.damp(controls.target.y, defaultControlsTarget.y, smoothness, delta);
   controls.target.z = THREE.MathUtils.damp(controls.target.z, defaultControlsTarget.z, smoothness, delta);
 
+  // No controls.update() while we're driving the camera by hand: it re-clamps
+  // polar angle / distance every frame and re-applies damped drag inertia,
+  // both of which fight the damp above.
   camera.lookAt(controls.target);
-  controls.update();
 
   const cameraDone = camera.position.distanceTo(defaultCameraPosition) < 0.01;
   const targetDone = controls.target.distanceTo(defaultControlsTarget) < 0.01;
@@ -2050,11 +2941,16 @@ function animateEscape() {
     camera.position.copy(defaultCameraPosition);
     controls.target.copy(defaultControlsTarget);
     camera.lookAt(controls.target);
+    // Back in the room: the normal orbit limits apply again.
+    freeOrbitLimits(false);
     controls.update();
     isEscapeAnimating = false;
     controls.enabled = true;
     selectedObject = null;
     outlinePass.selectedObjects = [];
+    // Back at the room view: if the cursor is genuinely on BMO again (and the
+    // user has moved it since we pulled out), dive straight back in.
+    evaluateHoverFocus();
     return;
   }
 
@@ -2091,31 +2987,37 @@ window.addEventListener('resize', () => {
     composerTarget.setSize(width, height);
 
     outlinePass.setSize(width, height);
-    bloomPass.setSize(Math.floor(width / 2), Math.floor(height / 2));
+    const bloomDiv = perfStage >= 1 ? 3 : 2;
+    bloomPass.setSize(Math.floor(width / bloomDiv), Math.floor(height / bloomDiv));
+    if (screenOverlay) layoutScreenOverlay();
   });
 });
 
 window.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !isEscapeAnimating && !hasOpenedStaticScreen && !helpOpen) {
-    if (selectedObject !== null || isFocusingObject) {
-      zoomOut.currentTime = 0;
-      zoomOut.volume = 0.05;
-      zoomOut.play();
-    }
-    isFocusingObject = false;
-    isEscapeAnimating = true;
-    lastEscapeTime = performance.now();
-    controls.enabled = false;
-    isFocusedOnBMO = false;
-    if (tvScreenMesh) unregisterClickable(tvScreenMesh);
-
-    
-    animateEscape();
+  // Browsing the screen: Escape steps back out instead of the normal path.
+  if (event.key === 'Escape' && isBrowsingScreen) {
+    exitBrowseAndZoomOut();
+    return;
+  }
+  // The intro video locks out scene clicks while it runs, so Escape has to be
+  // able to bail out of it — otherwise you're stuck until it finishes.
+  if (event.key === 'Escape' && isVideoPlaying && tvVideo) {
+    tvVideo.pause();      // the 'pause' listener clears isVideoPlaying
+    isVideoPlaying = false;
+    pendingVideoPlay = false;
+  }
+  // The browsing case returned above, so this covers everything else —
+  // including a flight into the desktop that the user changed their mind about.
+  if (event.key === 'Escape' && !isEscapeAnimating && !helpOpen && !isVideoPlaying) {
+    returnToRoomView();
   }
 });
 
 function focusOnObject(object) {
   isEscapeAnimating = false;
+  // Drop any stale "when this move finishes, open the desktop" callback left
+  // over from an interrupted BMO sequence.
+  onFocusComplete = null;
 
   let presetTarget = focusPresets[object.name] ? object : null;
   if (!presetTarget) {
@@ -2150,6 +3052,69 @@ function focusOnObject(object) {
   lastFocusTime = performance.now();
   focusAnimStartTime = performance.now();
   controls.enabled = false;
+  beginCameraTransition();
+}
+
+/* A single BMO camera position, used for both clicking him and for opening
+   the screen. Previously the click framed his body and the screen zoom moved
+   somewhere else, so there was always a second move to snap through. One
+   anchor (the screen centre), one axis, one distance — so the camera arrives
+   once and never moves again. */
+const BMO_VIEW_DIR = new THREE.Vector3(1, 0, 0);
+const BMO_INTRO_DISTANCE  = 2.061;  // click BMO — wide desk framing
+const BMO_SCREEN_DISTANCE = 0.55;   // after the video — settles onto the screen
+
+function focusOnBmoAxis(distance) {
+  if (!tvScreenMesh) return false;
+  onFocusComplete = null;
+
+  const box = new THREE.Box3().setFromObject(tvScreenMesh);
+  const center = box.getCenter(new THREE.Vector3());
+
+  focusControlsTarget.copy(center);
+  focusCameraPosition.copy(center)
+    .addScaledVector(BMO_VIEW_DIR.clone().normalize(), distance);
+
+  isEscapeAnimating = false;
+  isFocusingObject = true;
+  lastFocusTime = performance.now();
+  focusAnimStartTime = performance.now();
+  controls.enabled = false;
+  beginCameraTransition();
+  return true;
+}
+
+/* Mouse-driven look around the desk. Camera AND look-at move together, so the
+   framing trucks sideways — mouse right reveals the bookshelf, mouse down
+   reveals more desk — rather than pivoting on a fixed point.
+
+   It eases to zero (never snaps) the moment the desktop iframe is mounted or
+   the intro video plays. A view that drifts under the cursor is exactly what
+   made the old parallax impossible to click through, and the 2D site has to
+   stay clickable. */
+function computeBmoPanTarget(out) {
+  out.set(0, 0, 0);
+  // No pan in the BMO view: the iframe must not drift under the cursor.
+  if (viewState === VIEW_BMO || isBrowsingScreen || isVideoPlaying) return out;
+
+  // Basis taken from the DESTINATION pose, not camera.quaternion. During a
+  // flight the camera still carries the old orientation, and priming the pan
+  // from that would aim the zoom at the wrong place.
+  const reach = focusCameraPosition.distanceTo(focusControlsTarget);
+  _bmoForward.subVectors(focusCameraPosition, focusControlsTarget).normalize();
+  _bmoRight.crossVectors(WORLD_UP, _bmoForward).normalize();
+  _bmoUp.crossVectors(_bmoForward, _bmoRight).normalize();
+
+  return out
+    .addScaledVector(_bmoRight, mouseNDC.x * BMO_PAN_X_FRACTION * reach)
+    .addScaledVector(_bmoUp,    mouseNDC.y * BMO_PAN_Y_FRACTION * reach);
+}
+
+function updateBmoPan(dt) {
+  computeBmoPanTarget(bmoParallaxTarget);
+  bmoParallaxCurrent.x = THREE.MathUtils.damp(bmoParallaxCurrent.x, bmoParallaxTarget.x, BMO_PAN_SMOOTHNESS, dt);
+  bmoParallaxCurrent.y = THREE.MathUtils.damp(bmoParallaxCurrent.y, bmoParallaxTarget.y, BMO_PAN_SMOOTHNESS, dt);
+  bmoParallaxCurrent.z = THREE.MathUtils.damp(bmoParallaxCurrent.z, bmoParallaxTarget.z, BMO_PAN_SMOOTHNESS, dt);
 }
 
 function animateObjectFocus() {
@@ -2160,24 +3125,62 @@ function animateObjectFocus() {
   lastFocusTime = now;
   const smoothness = 5;
 
-  camera.position.x = THREE.MathUtils.damp(camera.position.x, focusCameraPosition.x, smoothness, delta);
-  camera.position.y = THREE.MathUtils.damp(camera.position.y, focusCameraPosition.y, smoothness, delta);
-  camera.position.z = THREE.MathUtils.damp(camera.position.z, focusCameraPosition.z, smoothness, delta);
-  controls.target.x = THREE.MathUtils.damp(controls.target.x, focusControlsTarget.x, smoothness, delta);
-  controls.target.y = THREE.MathUtils.damp(controls.target.y, focusControlsTarget.y, smoothness, delta);
-  controls.target.z = THREE.MathUtils.damp(controls.target.z, focusControlsTarget.z, smoothness, delta);
+  // Fly to the panned goal when a BMO view is the destination. Aiming at the
+  // un-panned pose and letting the pan take over on arrival is what produced
+  // the snap-to-the-mouse on the way in.
+  /* Aim at the live pan TARGET, not the smoothed accumulator.
 
+     primeBmoPan() used to snap the accumulator to the mouse the instant a pose
+     was set, so the flight had a stable goal. That was fine zooming in from
+     the room (the pan was 0 and stayed 0 in the BMO view) but wrong zooming
+     OUT of the BMO view, where the pan is forced to 0: the accumulator jumped
+     from 0 to the full mouse offset in one frame, and the goal lurched
+     sideways just as the dolly started. That's the small snap on the way out.
+
+     Aiming at the target instead means the goal is correct and stationary from
+     frame one, with nothing to jump. The accumulator damps toward the same
+     value during the ~1s flight (time constant ~330ms), so by the time the
+     hold takes over the two agree and the handover is seamless. */
+  _focusGoalPos.copy(focusCameraPosition);
+  _focusGoalTgt.copy(focusControlsTarget);
+  if (isFocusedOnBMO) {
+    _focusGoalPos.add(bmoParallaxTarget);
+    _focusGoalTgt.add(bmoParallaxTarget);
+  }
+
+  camera.position.x = THREE.MathUtils.damp(camera.position.x, _focusGoalPos.x, smoothness, delta);
+  camera.position.y = THREE.MathUtils.damp(camera.position.y, _focusGoalPos.y, smoothness, delta);
+  camera.position.z = THREE.MathUtils.damp(camera.position.z, _focusGoalPos.z, smoothness, delta);
+  controls.target.x = THREE.MathUtils.damp(controls.target.x, _focusGoalTgt.x, smoothness, delta);
+  controls.target.y = THREE.MathUtils.damp(controls.target.y, _focusGoalTgt.y, smoothness, delta);
+  controls.target.z = THREE.MathUtils.damp(controls.target.z, _focusGoalTgt.z, smoothness, delta);
+
+  // Deliberately no controls.update() here — see animateEscape.
   camera.lookAt(controls.target);
-  controls.update();
 
-  const cameraDone = camera.position.distanceTo(focusCameraPosition) < 0.01;
-  const targetDone = controls.target.distanceTo(focusControlsTarget) < 0.01;
-  const timedOut = (now - focusAnimStartTime) > 3000; // force-complete after 3s
+  // Against the (possibly moving) goal, with a little more tolerance than the
+  // static case: while the mouse is moving the camera trails the pan slightly
+  // and a 0.01 threshold would never be met.
+  const cameraDone = camera.position.distanceTo(_focusGoalPos) < 0.02;
+  const targetDone = controls.target.distanceTo(_focusGoalTgt) < 0.02;
+  // Safety net only. It should never be what ends the move now that the orbit
+  // clamp isn't holding the camera short of the goal — if it does fire, the
+  // final copy() below is a visible snap.
+  const timedOut = (now - focusAnimStartTime) > 3000;
 
   if ((cameraDone && targetDone) || timedOut) {
-    camera.position.copy(focusCameraPosition);
+    if (timedOut && !cameraDone) {
+      console.warn('[focus] timed out short of target by',
+                   camera.position.distanceTo(focusCameraPosition).toFixed(3));
+    }
+    // A BMO view is held by a damper that keeps running, so snapping the
+    // camera onto the pose here would undo the whole point. Only the static
+    // focuses land exactly.
+    if (!isFocusedOnBMO) {
+      camera.position.copy(focusCameraPosition);
+    }
     controls.target.copy(focusControlsTarget);
-    camera.lookAt(controls.target);
+    camera.lookAt(isFocusedOnBMO ? _focusGoalTgt : controls.target);
     controls.update();
     isFocusingObject = false;
     controls.enabled = true;
@@ -2202,11 +3205,64 @@ ${object.name}: {
 `);
 }
 
+/* K — dump the exact camera pose you're currently looking from, as a
+   paste-ready snippet. The companion to L: L gives you offsets relative to a
+   selected object (for focusPresets), K gives you the absolute pose. */
+function logCameraPose() {
+  const p = camera.position;
+  const t = controls.target;
+  const offset = p.clone().sub(t);
+  const sph = new THREE.Spherical().setFromVector3(offset);
+  const deg = (r) => THREE.MathUtils.radToDeg(r).toFixed(1);
+
+  const snippet =
+`camera.position.set(${p.x.toFixed(3)}, ${p.y.toFixed(3)}, ${p.z.toFixed(3)});
+controls.target.set(${t.x.toFixed(3)}, ${t.y.toFixed(3)}, ${t.z.toFixed(3)});`;
+
+  // Polar angle matters: a pose outside the room-view limits can't be reached
+  // by controls.update(), which is what made focus moves end in a hard snap.
+  const outOfRange = sph.phi < ORBIT_MIN_POLAR || sph.phi > ORBIT_MAX_POLAR;
+  const limits = `orbit limits ${deg(ORBIT_MIN_POLAR)}deg..${deg(ORBIT_MAX_POLAR)}deg`;
+
+  console.log(
+`--- camera pose ---
+${snippet}
+distance ${sph.radius.toFixed(3)} | azimuth ${deg(sph.theta)}deg | polar ${deg(sph.phi)}deg
+${outOfRange ? `WARNING: polar is OUTSIDE the room-view ${limits} — fine as a focus pose (limits are lifted for those), but the free-orbit camera can never sit here.` : `within the room-view ${limits}`}
+${selectedObject ? `selected: ${selectedObject.name || selectedObject.type} (press L for an offset preset)` : 'nothing selected'}`);
+
+  // Zoom here is dolly distance (above) — OrbitControls moves a perspective
+  // camera rather than touching camera.zoom/fov. Nothing writes these today,
+  // so they're only worth printing if that ever changes.
+  if (camera.zoom !== 1 || camera.fov !== 30) {
+    console.log(`projection zoom ${camera.zoom.toFixed(3)} | fov ${camera.fov.toFixed(1)}deg`);
+  }
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(snippet).catch(() => {});
+  }
+
+  tipBar.innerText = `camera pose logged to console (dist ${sph.radius.toFixed(2)})`;
+  tipBar.style.opacity = '1';
+  if (tipBar.fadeTimeout) clearTimeout(tipBar.fadeTimeout);
+  tipBar.fadeTimeout = setTimeout(() => { tipBar.style.opacity = '0'; }, 2000);
+}
+window.logCameraPose = logCameraPose;
+
 window.addEventListener('keydown', (event) => {
-  if (event.key.toLowerCase() === 'l') {
+  // Don't hijack browser shortcuts or typing in a field.
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  const el = event.target;
+  if (el && (el.isContentEditable || /^(input|textarea|select)$/i.test(el.tagName || ''))) return;
+
+  const key = event.key.toLowerCase();
+
+  if (key === 'l') {
     if (!selectedObject) { console.log('No object selected.'); return; }
     logCurrentViewForObject(selectedObject);
   }
+
+  if (key === 'k') logCameraPose();
 });
 
 function downsampleTextures(model, maxPx = 1024, protectRoots = []) {
@@ -2291,36 +3347,434 @@ function normalizeMeshUVs(mesh) {
   uv.needsUpdate = true;
 }
 
+/* Mounts /bmo_desktop as a live iframe sitting exactly on the screen mesh.
+   The mesh switches to a depth-only material so it renders no colour but
+   still occludes correctly — BMO's body hides the iframe when you orbit. */
+/* ============================================================================
+   Screen audio — one track, two ways of hearing it.
+
+   The music lives on BMO. From the room you should hear it the way you'd hear
+   a small speaker across a room: no bass, a honky mid-range peak, a bit of
+   grit from a cone being driven too hard, and positioned in 3D. Move in to the
+   screen and it should open out into clean, centred stereo, as if you'd put
+   headphones on.
+
+   Both are fed from ONE MediaElementSource — createMediaElementSource can only
+   ever be called once per element — split into two parallel chains whose gains
+   crossfade. Nothing is rebuilt or reconnected on a view change, so there is
+   nothing to click or pop.
+
+              ┌─ hp → peak → saturate → lp → speakerGain → panner ─┐
+     source ──┤                                                    ├─→ listener
+              └─ directGain ──────────────────────────────────────-┘
+                             (bypasses the panner entirely)
+
+   The track is owned here rather than inside the iframe because Web Audio can
+   only process an element from its own document; the desktop's mini-player
+   drives it over postMessage. ========================================== */
+
+const SCREEN_MUSIC_URL = '/hotel.wav';
+const SCREEN_MUSIC_VOLUME = 0.32;
+/* Trim on the speaker path per view. The panner already attenuates by
+   distance, but the desk framing puts your ear about a foot from the thing,
+   where the raw distance curve is louder than it wants to be. */
+const SPEAKER_LEVEL_ROOM = 1.0;
+const SPEAKER_LEVEL_DESK = 0.55;
+let screenAudio = null;
+
+/* Soft-clip curve for the cone-being-overdriven grit. tanh-shaped: linear in
+   the middle, compressing towards the rails, so quiet passages stay clean and
+   only peaks distort. */
+function makeSaturationCurve(drive = 2.2, samples = 2048) {
+  const curve = new Float32Array(samples);
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / (samples - 1) - 1;
+    curve[i] = Math.tanh(drive * x) / Math.tanh(drive);
+  }
+  return curve;
+}
+
+/* Ramp an AudioParam from wherever it actually is right now.
+   cancelScheduledValues() on its own leaves the param snapping back to the
+   last explicitly-set value, which is precisely the click this is avoiding —
+   so read the live value first and anchor it at `now`. */
+function rampParam(param, target, duration, ctx) {
+  const now = ctx.currentTime;
+  const current = param.value;
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(current, now);
+  param.linearRampToValueAtTime(target, now + Math.max(0.01, duration));
+}
+
+function initScreenAudio() {
+  if (screenAudio) return screenAudio;
+
+  const listener = new THREE.AudioListener();
+  camera.add(listener);                 // rides the camera, so 3D pans follow the view
+  const ctx = listener.context;
+
+  const el = new Audio(SCREEN_MUSIC_URL);
+  el.loop = true;
+  el.volume = SCREEN_MUSIC_VOLUME;
+  el.preload = 'auto';
+  el.crossOrigin = 'anonymous';
+
+  const source = ctx.createMediaElementSource(el);
+
+  // ---- Speaker path -------------------------------------------------------
+  // Bass roll-off: a 2" cone simply cannot move enough air below ~350Hz.
+  const highpass = ctx.createBiquadFilter();
+  highpass.type = 'highpass';
+  highpass.frequency.value = 360;
+  highpass.Q.value = 0.7;
+
+  // The boxy resonance that makes a small enclosure sound like one.
+  const midPeak = ctx.createBiquadFilter();
+  midPeak.type = 'peaking';
+  midPeak.frequency.value = 1900;
+  midPeak.Q.value = 1.6;
+  midPeak.gain.value = 7.5;
+
+  const saturator = ctx.createWaveShaper();
+  saturator.curve = makeSaturationCurve(2.2);
+  saturator.oversample = '2x';          // no aliasing from the harmonics we add
+
+  // Top-end roll-off — cheap drivers give up long before 20kHz.
+  const lowpass = ctx.createBiquadFilter();
+  lowpass.type = 'lowpass';
+  lowpass.frequency.value = 4200;
+  lowpass.Q.value = 0.6;
+
+  const speakerGain = ctx.createGain();
+  speakerGain.gain.value = 1;           // the room view is where we start
+
+  source.connect(highpass);
+  highpass.connect(midPeak);
+  midPeak.connect(saturator);
+  saturator.connect(lowpass);
+  lowpass.connect(speakerGain);
+
+  // three's PositionalAudio owns the panner and keeps it glued to the mesh it
+  // is added to; setNodeSource lets our filtered chain be its input.
+  const positional = new THREE.PositionalAudio(listener);
+  positional.setNodeSource(speakerGain);
+  positional.setDistanceModel('exponential');
+  positional.setRefDistance(0.8);
+  positional.setRolloffFactor(1.4);
+  (tvScreenMesh || bmoObject || scene).add(positional);
+
+  // ---- Direct path --------------------------------------------------------
+  // Straight to the listener's input: no panner, no filters, so it stays
+  // centred and full-range no matter where the camera is.
+  const directGain = ctx.createGain();
+  directGain.gain.value = 0;
+  source.connect(directGain);
+  directGain.connect(listener.getInput());
+
+  screenAudio = {
+    el, ctx, listener, source, positional,
+    speakerGain, directGain,
+    filters: { highpass, midPeak, saturator, lowpass },
+    perspective: 'speaker',
+  };
+  window._audio = screenAudio;
+  console.log('[audio] graph ready — speaker + direct paths');
+  return screenAudio;
+}
+
+/* Crossfade between the two ways of hearing it.
+   mode: 'speaker' (in the room) | 'direct' (on the screen). */
+function setAudioPerspective(mode, duration = 0.9, speakerLevel = SPEAKER_LEVEL_ROOM) {
+  const a = screenAudio;
+  if (!a) return;
+  const toDirect = mode === 'direct';
+  // Linear, not equal-power: the two paths carry the SAME signal, so they sum
+  // coherently and a linear fade holds the level steady. An equal-power curve
+  // would bulge in the middle of the transition.
+  rampParam(a.speakerGain.gain, toDirect ? 0 : speakerLevel, duration, a.ctx);
+  rampParam(a.directGain.gain,  toDirect ? 1 : 0, duration, a.ctx);
+  a.perspective = mode;
+}
+
+function screenMusicPlaying() {
+  return !!(screenAudio && !screenAudio.el.paused);
+}
+
+function setScreenMusic(action) {
+  const a = initScreenAudio();
+  if (a.ctx.state === 'suspended') a.ctx.resume().catch(() => {});
+  const wantPlay = action === 'play' || (action === 'toggle' && a.el.paused);
+  if (wantPlay) a.el.play().catch(() => {});
+  else a.el.pause();
+  return !a.el.paused;
+}
+
+/* The desktop's mini-player lives in the iframe and can't reach the graph, so
+   it asks for playback over postMessage and we answer with the new state. */
+window.addEventListener('message', (event) => {
+  if (event.origin !== window.location.origin) return;
+  if (!screenIframe || event.source !== screenIframe.contentWindow) return;
+  const msg = event.data;
+  if (!msg || msg.source !== 'bmo-desktop' || msg.type !== 'music') return;
+
+  const playing = setScreenMusic(msg.action);
+  event.source.postMessage(
+    { source: 'bmo-host', type: 'music-state', playing },
+    window.location.origin
+  );
+});
+
+/* The 2D site as a FLAT, untransformed overlay.
+
+   It used to be a CSS3DObject transformed onto the screen plane. That renders
+   beautifully and is completely unclickable here: CSS3DRenderer nests the
+   object under domElement > viewElement > cameraElement with a perspective and
+   `transform-style: preserve-3d`, and Chrome hit-tests straight past that
+   subtree — document.elementFromPoint over the middle of the site returned
+   first <body>, then (once every level was made interactive) the CSS3D root
+   div, never the iframe. The site was mounted, visible and running, and could
+   not receive a single click.
+
+   It does not need a 3D transform. The BMO view is locked dead-on to the
+   screen along (1,0,0) with the pan disabled, so the screen projects to a
+   plain axis-aligned rectangle. Position an ordinary fixed-position iframe on
+   that rectangle and it is pixel-accurate and trivially clickable.
+
+   The iframe is created once and only ever hidden, never reparented —
+   reparenting an iframe reloads its document and would lose your place. */
+/* The site renders at a FIXED logical size and is scaled to whatever the
+   screen projects to, rather than laying out against the raw pixel rect.
+
+   The rect changes with the window size and the zoom distance, so letting the
+   site lay out against it directly meant its viewport was some arbitrary size
+   nothing was designed for — cramped columns, clipped panels. At a fixed
+   1280-wide viewport it always lays out like a normal desktop and the scale
+   just makes it bigger or smaller, which is how a real screen behaves.
+
+   Height is derived from the screen mesh's own aspect so the scale stays
+   uniform and nothing is stretched. Raise this to fit more on the screen at
+   smaller text; lower it for larger text and less content. */
+const SCREEN_DESIGN_WIDTH = 1280;
+
+/* Grow the site overlay outward, in CSS pixels added to the LEFT and RIGHT
+   edges (negative shrinks it).
+
+   The overlay is derived from the bmo_face plane, but the lit screen you
+   actually see is painted on BMO's body shell too and is slightly larger than
+   that plane — so a thin band of BMO's own screen texture shows around the
+   site. Measured off a render it's about 21 CSS pixels a side.
+
+   Top and bottom grow proportionally, so the box keeps the screen's aspect
+   and the site still fills it exactly instead of letterboxing. */
+const SCREEN_EXPAND = 1;
+let screenDesignW = SCREEN_DESIGN_WIDTH;
+let screenDesignH = 838;
+
+function mountScreenIframe() {
+  if (screenOverlay) return;
+
+  if (tvScreenMesh) {
+    const box = new THREE.Box3().setFromObject(tvScreenMesh);
+    const size = box.getSize(new THREE.Vector3());
+    const dims = [size.x, size.y, size.z].sort((a, b) => b - a);
+    screenDesignW = SCREEN_DESIGN_WIDTH;
+    screenDesignH = Math.round(SCREEN_DESIGN_WIDTH / (dims[0] / dims[1]));
+  }
+
+  screenOverlay = document.createElement('div');
+  Object.assign(screenOverlay.style, {
+    position: 'fixed',
+    left: '0px', top: '0px', width: '0px', height: '0px',
+    zIndex: '4',              // above the WebGL canvas (z-index 1)
+    overflow: 'hidden',
+    borderRadius: SCREEN_CORNER_RADIUS,
+    background: '#0a0e27',
+    display: 'none',
+    opacity: '0',
+    transition: 'opacity 0.28s ease-out',
+    pointerEvents: 'auto',
+  });
+
+  screenIframe = document.createElement('iframe');
+  screenIframe.src = '/bmo_desktop';
+  screenIframe.title = "BMO's desktop";
+  Object.assign(screenIframe.style, {
+    display: 'block',
+    // Fixed logical viewport; layoutScreenOverlay scales it to the rect.
+    width: `${screenDesignW}px`,
+    height: `${screenDesignH}px`,
+    transformOrigin: '0 0',
+    border: '0', background: '#0a0e27', pointerEvents: 'auto',
+  });
+  screenOverlay.appendChild(screenIframe);
+
+  // Non-interactive CRT cues, so the site reads as a screen rather than a
+  // browser window pasted over the scene.
+  const glass = document.createElement('div');
+  glass.style.cssText = `
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: ${SCREEN_CORNER_RADIUS};
+    background:
+      linear-gradient(105deg,
+        rgba(255,255,255,0.13) 0%,
+        rgba(255,255,255,0.05) 17%,
+        rgba(255,255,255,0.00) 33%),
+      repeating-linear-gradient(to bottom,
+        rgba(0,0,0,0.10) 0px, rgba(0,0,0,0.10) 2px,
+        rgba(0,0,0,0.00) 2px, rgba(0,0,0,0.00) 4px),
+      radial-gradient(ellipse at 50% 50%,
+        rgba(0,0,0,0.00) 55%, rgba(0,0,0,0.34) 100%);
+    box-shadow: inset 0 0 55px rgba(0,0,0,0.40);
+  `;
+  screenOverlay.appendChild(glass);
+  document.body.appendChild(screenOverlay);
+
+  screenMounted = true;
+  initScreenAudio();
+  window._screen = { overlay: screenOverlay, iframe: screenIframe };
+  console.log('[screen] iframe mounted on BMO');
+  enterBrowseMode();
+}
+
+/* Park the overlay exactly on the screen's projected rectangle. Cheap enough
+   to run every frame, which keeps it glued while the camera damps in. */
+function layoutScreenOverlay() {
+  if (!screenOverlay) return;
+  const r = screenRectOnViewport();
+  if (!r) return;
+  // Vertical expansion is derived from the horizontal so the aspect holds.
+  const expandX = SCREEN_EXPAND;
+  const expandY = SCREEN_EXPAND * (screenDesignH / screenDesignW);
+  const left = r.left - expandX;
+  const top  = r.top  - expandY;
+  const w = Math.max(0, (r.right  + expandX) - left);
+  const h = Math.max(0, (r.bottom + expandY) - top);
+  screenOverlay.style.left   = `${left}px`;
+  screenOverlay.style.top    = `${top}px`;
+  screenOverlay.style.width  = `${w}px`;
+  screenOverlay.style.height = `${h}px`;
+
+  /* Full-bleed: the site fills the glass edge to edge. The rounded aperture
+     still clips the very corners, so the desktop keeps its own safe-area
+     padding (--screen-safe in bmo_desktop.html) and puts nothing there. */
+  if (screenIframe) {
+    // Uniform scale, centred. The box keeps the screen's aspect, so the two
+    // ratios agree and nothing is letterboxed or stretched.
+    const scale = Math.min(w / screenDesignW, h / screenDesignH);
+    const offsetX = (w - screenDesignW * scale) / 2;
+    const offsetY = (h - screenDesignH * scale) / 2;
+    screenIframe.style.transform =
+      `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  }
+}
+
+function enterBrowseMode() {
+  isBrowsingScreen = true;
+  screenOpening = false;
+  controls.enabled = false;
+  // Hard-disable the canvas so every click in the viewport belongs to the
+  // iframe. The pointerdown guard covers the JS side; this covers the case
+  // where the canvas would otherwise swallow the event before it gets there.
+  renderer.domElement.style.pointerEvents = 'none';
+  if (screenOverlay) {
+    screenOverlay.style.display = 'block';
+    layoutScreenOverlay();
+    requestAnimationFrame(() => { if (screenOverlay) screenOverlay.style.opacity = '1'; });
+  }
+  document.body.style.cursor = 'default';
+  outlinePass.selectedObjects = [];
+
+  /* Self-check. Every listener in this file is bound to `window`, so the 3D
+     scene keeps responding even when something is stacked over the viewport —
+     but an iframe only gets events if it is the actual hit-test target. That
+     makes "the site is silently unclickable" invisible from the outside, so
+     name the culprit in the console rather than leaving it to guesswork. */
+  requestAnimationFrame(() => {
+    const el = screenOverlay;
+    const top = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    if (el && top && (top === el || el.contains(top))) {
+      console.log('[screen] live — the 2D site is the topmost element and has pointer events');
+    } else {
+      const stack = (document.elementsFromPoint
+        ? document.elementsFromPoint(window.innerWidth / 2, window.innerHeight / 2)
+        : []).map(n => n.tagName.toLowerCase() +
+                       (n.id ? '#' + n.id : '') +
+                       ' {pointer-events:' + getComputedStyle(n).pointerEvents + '}');
+      console.warn('[screen] BLOCKED — topmost element at the centre of the viewport is', top,
+                   '\n           hit-test stack:', stack,
+                   '\n           iframe mounted:', screenMounted, '| overlay:', !!screenOverlay);
+    }
+  });
+}
+
+/* Hand pointer events back to the 3D scene WITHOUT destroying the iframe.
+   Tearing it down would reload /bmo_desktop on the way back in and lose
+   whatever was open on it. */
+function exitBrowseMode() {
+  isBrowsingScreen = false;
+  screenOpening = false;
+  renderer.domElement.style.pointerEvents = 'auto';
+  if (screenOverlay) {
+    screenOverlay.style.opacity = '0';
+    // Hidden, never removed: display:none keeps the iframe's document (and
+    // whatever you had open on it) alive for the next visit.
+    clearTimeout(screenOverlay._hideTimer);
+    screenOverlay._hideTimer = setTimeout(() => {
+      if (screenOverlay && !isBrowsingScreen) screenOverlay.style.display = 'none';
+    }, 300);
+  }
+}
+
+// DOM button — the canvas has pointer-events off while browsing, so the
+// exit affordance has to live outside it.
+const screenExitBtn = document.createElement('button');
+screenExitBtn.textContent = '[ esc — step back ]';
+screenExitBtn.style.cssText = `
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  z-index: 5; display: none; cursor: pointer;
+  padding: 10px 18px; font-family: monospace; font-size: 12px;
+  letter-spacing: 1px; color: #4ade80; background: rgba(10,14,39,0.85);
+  border: 1px solid #4ade80;
+`;
+screenExitBtn.addEventListener('click', () => exitBrowseAndZoomOut());
+// Deliberately NOT appended. Stepping back out of the 2D site is done by
+// moving the pointer off BMO, so the button would just be clutter over the
+// site. Kept constructed so the show/hide calls below stay harmless.
+
+
+function exitBrowseAndZoomOut() {
+  if (!isBrowsingScreen) return;
+  exitBrowseMode();
+  returnToRoomView();
+}
+
 function showStaticScreen() {
   if (tvVideo) {
     tvVideo.pause();
     isVideoPlaying = false;
   }
+
+  if (INLINE_SCREEN) {
+    mountScreenIframe();
+    return;
+  }
+
+  // Fallback: full page navigation (?classicscreen)
   navCover.style.opacity = '1';
-
-
-
   setTimeout(() => {
     window.location.href = '/bmo_desktop';
   }, 260);
 }
 
 function zoomToScreenThenShowStatic() {
-  if (!tvScreenMesh || hasOpenedStaticScreen) return;
-  hasOpenedStaticScreen = true;
+  if (!tvScreenMesh || screenOpening || screenMounted) return;
+  screenOpening = true;
 
-  const box = new THREE.Box3().setFromObject(tvScreenMesh);
-  const center = box.getCenter(new THREE.Vector3());
-  const direction = camera.position.clone().sub(center).normalize();
-  const zoomDistance = 0.4;
-
-  focusControlsTarget.copy(center);
-  focusCameraPosition.copy(center).add(direction.multiplyScalar(zoomDistance));
-
-  isFocusingObject = true;
-  lastFocusTime = performance.now();
-  focusAnimStartTime = performance.now();
-  controls.enabled = false;
+  // Animates in from wherever the desk framing left the camera — damped in
+  // animateObjectFocus, so this is a real move, not a cut.
+  focusOnBmoAxis(INLINE_SCREEN ? BMO_SCREEN_DISTANCE : 0.4);
 
   onFocusComplete = () => { showStaticScreen(); };
 }

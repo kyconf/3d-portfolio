@@ -568,12 +568,6 @@ background-color: white;
     height: 10px;
     background: var(--green);
     border-radius: 50%;
-    animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
 }
 
 .status-text {
@@ -1793,13 +1787,6 @@ background-color: white;
     height: 8px;
     background: var(--green);
     border-radius: 50%;
-    box-shadow: 0 0 6px var(--green);
-    animation: pdPulse 1.6s ease-in-out infinite;
-}
-
-@keyframes pdPulse {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.35; }
 }
 
 .pd-desc {
@@ -1850,4 +1837,211 @@ background-color: white;
     .pd-media { border-right: none; border-bottom: 2px solid var(--gray); }
     .pd-video { max-height: 300px; }
     .pd-title { font-size: 1.2rem; }
+}
+
+/* =========================================================
+   EXPERIENCE TAB
+   A vertical "career log" timeline — a spine running down the
+   left with a node per entry, each node wired into a pixel-box
+   card. Deliberately distinct from the grid layouts used by
+   Projects/Skills, but built from the same primitives (pixel-box,
+   color-strip, tag, status-dot pulse) so it still reads as part
+   of the same system. Research/publications live at the bottom,
+   introduced by a labelled divider, per Kyle's request to fold
+   RESEARCH into the end of this tab instead of its own nav item.
+   ========================================================= */
+.exp-timeline {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    padding-left: 26px;
+}
+
+/* The spine — a dashed vertical line threading through every node,
+   continuing past the last real entry into .exp-future below. */
+.exp-timeline::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    bottom: -34px;
+    left: 3px;
+    width: 2px;
+    background: repeating-linear-gradient(
+        to bottom,
+        var(--green) 0px, var(--green) 6px,
+        transparent 6px, transparent 12px
+    );
+}
+
+.exp-item {
+    position: relative;
+}
+
+.exp-node {
+    position: absolute;
+    top: 22px;
+    left: -26px;
+    width: 8px;
+    height: 8px;
+}
+
+.exp-node-dot {
+    display: block;
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    /* Ring only — it separates the node from the timeline rule behind it.
+       The 8px coloured halo that used to sit here was decoration. */
+    box-shadow: 0 0 0 4px #1a1a1a;
+}
+
+.exp-node-dot--upcoming {
+    background: var(--amber);
+    box-shadow: 0 0 0 4px #1a1a1a;
+}
+
+.exp-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: transform 0.1s ease-out, border-color 0.15s, background 0.15s;
+}
+
+.exp-card:hover {
+    transform: translateY(-4px) translateX(2px);
+    border-color: var(--amber);
+    background: rgba(245, 166, 35, 0.06);
+}
+
+.exp-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.exp-heading { min-width: 0; }
+
+.exp-role {
+    font-size: 15px;
+    color: var(--white);
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.exp-company {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--white);
+}
+
+.exp-status {
+    flex-shrink: 0;
+    font-family: 'Silkscreen', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 5px 12px;
+    border: 1px solid var(--amber);
+    color: var(--amber);
+    white-space: nowrap;
+}
+
+.exp-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    padding: 10px 0;
+    border-top: 1px solid var(--gray);
+    border-bottom: 1px solid var(--gray);
+}
+
+.exp-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+}
+
+.exp-meta-k {
+    color: var(--gray-light);
+    letter-spacing: 1px;
+}
+
+.exp-meta-v { color: var(--white); }
+
+.exp-desc {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    color: #ccc;
+    margin: 0;
+}
+
+.exp-card .tag-container {
+    margin-top: 0;
+    padding-top: 0;
+}
+
+/* The dashed spine trails off into this row — signals there's more
+   career log to come without needing a fake "empty" entry. */
+.exp-future {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 2px;
+}
+
+.exp-future-dot {
+    position: absolute;
+    left: -26px;
+    width: 8px;
+    height: 8px;
+    border: 1px dashed var(--gray-light);
+    border-radius: 50%;
+}
+
+.exp-future-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: var(--gray-light);
+    font-style: italic;
+}
+
+.exp-divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 34px 0 20px;
+}
+
+.exp-divider-line {
+    flex: 1;
+    height: 1px;
+    background: var(--gray);
+}
+
+.exp-divider-label {
+    flex-shrink: 0;
+    font-family: 'Silkscreen', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--green);
+    white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+    .exp-timeline { padding-left: 20px; gap: 22px; }
+    .exp-timeline::before { left: 2px; }
+    .exp-node { left: -20px; }
+    .exp-future-dot { left: -20px; }
+    .exp-role { font-size: 13px; }
+    .exp-desc { font-size: 12px; }
+    .exp-divider-label { font-size: 9px; }
 }

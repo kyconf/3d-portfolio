@@ -28,9 +28,14 @@
     --bmo-gray: #2a4a3a;
     --bmo-gray-light: #5a8a6a;
     --px: 8px;
+    /* BMO's screen is a rounded aperture and his bezel overlaps the corners,
+       so the desktop keeps everything out of them. The site still fills the
+       glass edge to edge — only the content is held in. */
+    --screen-safe: 30px;
   }
 
   .maximized {
+  /* Genuinely full-bleed, right out to the glass. */
   top: 0 !important;
   left: 0 !important;
   width: 100vw !important;
@@ -39,6 +44,14 @@
   border-radius: 0 !important;
 }
 
+  /* Only the titlebar sits inside the rounded corners, so it is the one row
+     that needs the safe area — the window itself does not. Its text and its
+     buttons are pulled in; everything below is past the curve already. */
+  .maximized > .titlebar{
+    padding-left: var(--screen-safe);
+    padding-right: var(--screen-safe);
+  }
+
   body{
     background: var(--bmo-green);
     width:100vw;height:100vh;overflow:hidden;
@@ -46,24 +59,23 @@
     color:var(--bmo-white);
     position:relative;
     background-image:
-      linear-gradient(rgba(90,200,150,0.15) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(90,200,150,0.15) 1px, transparent 1px);
+      linear-gradient(rgba(74,158,131,0.13) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(74,158,131,0.13) 1px, transparent 1px);
     background-size:32px 32px;
   }
 
 .bmo-screen-frame {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  /* Control the size of BMO's face here */
-  width: 800px;
-  height: 650px;
+  /* Fills the viewport so the desktop matches BMO's screen pane at whatever
+     aspect the iframe is given. Was a fixed 800x650, which left the face as a
+     centred island inside the wider (1.53 aspect) screen. */
+  inset: 0;
+  width: 100%;
+  height: 100%;
 
-  border-radius: 20px;
   overflow: hidden;
   z-index: -1;
-  background: #d1ffd3;
+  background: #bad9c7;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -77,7 +89,7 @@
 }
 
 body {
-  background: #d1ffd3;
+  background: #bad9c7;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
@@ -92,7 +104,7 @@ body {
 
 
   .icons{
-    position:absolute;top:20px;left:16px;
+    position:absolute;top:var(--screen-safe);left:var(--screen-safe);
     display:flex;flex-direction:column;gap:10px;z-index:2;
   }
   .icon{
@@ -102,15 +114,11 @@ body {
   .icon:hover .icon-shape{filter:brightness(1.2);}
   .icon:active{transform:scale(0.9);}
   .icon-shape{
-    width:36px;height:28px;position:relative;
+    width:34px;height:34px;
     transition:filter 0.15s;
   }
-  .icon-shape .body{
-    position:absolute;bottom:0;left:0;width:100%;height:80%;border-radius:3px;
-  }
-  .icon-shape .tab{
-    position:absolute;top:0;left:0;width:55%;height:30%;border-radius:3px 3px 0 0;
-  }
+  /* pixelarticons folder, tinted by the inline color on .icon-shape. */
+  .icon-shape svg{width:100%;height:100%;display:block;}
   .icon span{
     font-size:6px;letter-spacing:1px;text-transform:uppercase;
     color:var(--bmo-dark);text-shadow:0 1px 0 rgba(255,255,255,0.3);
@@ -198,6 +206,41 @@ body {
   .btn-max{background:var(--bmo-green-dark);color:var(--bmo-dark);}
 
   .window-body{flex:1;overflow:hidden;padding:8px;}
+
+  /* Inline pixelarticons. fill=currentColor, so they take the colour of
+     whatever they sit in; crispEdges keeps the 2px grid from anti-aliasing
+     into mush at small sizes. */
+  .pxi{
+    display:inline-block;
+    vertical-align:-0.18em;
+    flex-shrink:0;
+  }
+
+  /* === Window dragging === */
+  /* The titlebar is the drag handle; its buttons keep their own cursor. */
+  .titlebar{cursor:move;user-select:none;}
+  .titlebar-buttons span{cursor:pointer;}
+
+  /* The rubber band. Only this moves while you drag — the window jumps to it
+     on release. Drawn with repeating gradients rather than `border:dashed`
+     so it reads as the old 50% stipple marquee instead of a modern dashed
+     rule: 2px on, 2px off, on all four edges. */
+  .drag-ghost{
+    position:absolute;
+    display:none;
+    z-index:98;
+    pointer-events:none;
+    background:
+      repeating-linear-gradient(to right,  var(--bmo-white) 0 2px, transparent 2px 4px) left  top    /100% 2px no-repeat,
+      repeating-linear-gradient(to right,  var(--bmo-white) 0 2px, transparent 2px 4px) left  bottom /100% 2px no-repeat,
+      repeating-linear-gradient(to bottom, var(--bmo-white) 0 2px, transparent 2px 4px) left  top    /2px 100% no-repeat,
+      repeating-linear-gradient(to bottom, var(--bmo-white) 0 2px, transparent 2px 4px) right top    /2px 100% no-repeat;
+    opacity:0.9;
+  }
+
+  /* .window animates top/left for the maximise tween. A drag has to land in
+     one frame, so that transition is suppressed for the drop. */
+  .window.no-anim{transition:none !important;}
 
   /* Terminal */
   .win-terminal{
@@ -304,7 +347,7 @@ body {
     position:absolute;bottom:0;left:0;right:0;height:36px;
     background:var(--bmo-green-dark);
     border-top:2px solid var(--bmo-teal);
-    display:flex;align-items:center;padding:0 8px;gap:6px;z-index:10;
+    display:flex;align-items:center;padding:0 var(--screen-safe);gap:6px;z-index:10;
   }
   .start-btn{
     background:var(--bmo-yellow);color:var(--bmo-dark);
@@ -321,7 +364,7 @@ body {
   }
   /* === Mini-player === */
   .mini-player{
-    position:absolute;bottom:44px;right:10px;
+    position:absolute;bottom:46px;right:var(--screen-safe);
     background:var(--bmo-screen);
     border:2px solid var(--bmo-teal);
     border-radius:4px;
@@ -350,13 +393,13 @@ body {
   }
 
   .version{
-    position:absolute;bottom:42px;right:10px;
+    position:absolute;bottom:42px;right:var(--screen-safe);
     font-family:'DM Mono',monospace;font-size:7px;
     color:var(--bmo-green-darker);z-index:1;
   }
 
   .pixel-football{
-    position:absolute;bottom:52px;left:20px;z-index:1;
+    position:absolute;bottom:52px;left:var(--screen-safe);z-index:1;
     font-family:'Pixelify Sans',sans-serif;font-size:9px;
     color:var(--bmo-teal);text-align:center;
     cursor:pointer;
@@ -389,10 +432,10 @@ body {
   @keyframes screenFlashFade{
     0%   { opacity:1;    background:#ffffff; }
     8%   { opacity:0.98; background:#f4ffff; }     /* slight cool tint as it cools off */
-    25%  { opacity:0.7;  background:#e6fff0; }
-    55%  { opacity:0.28; background:#d8ffe0; }
-    85%  { opacity:0.06; background:#d1ffd3; }
-    100% { opacity:0;    background:#d1ffd3; }
+    25%  { opacity:0.7;  background:#dcefe4; }
+    55%  { opacity:0.28; background:#cde6d8; }
+    85%  { opacity:0.06; background:#bad9c7; }
+    100% { opacity:0;    background:#bad9c7; }
   }
 
 
@@ -431,23 +474,23 @@ body {
 <!-- Desktop Icons -->
 <div class="icons">
   <div class="icon">
-    <div class="icon-shape"><div class="tab" style="background:var(--bmo-blue)"></div><div class="body" style="background:var(--bmo-blue)"></div></div>
+    <div class="icon-shape" style="color:var(--bmo-blue)"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M4 4h6v2H4zm0 14h16v2H4zM20 8h2v10h-2zM2 6h2v12H2zm8 0h10v2H10z"/></svg></div>
     <span>games</span>
   </div>
   <div class="icon">
-    <div class="icon-shape"><div class="tab" style="background:var(--bmo-yellow)"></div><div class="body" style="background:var(--bmo-yellow)"></div></div>
+    <div class="icon-shape" style="color:var(--bmo-yellow)"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M4 4h6v2H4zm0 14h16v2H4zM20 8h2v10h-2zM2 6h2v12H2zm8 0h10v2H10z"/></svg></div>
     <span>photos</span>
   </div>
   <div class="icon">
-    <div class="icon-shape"><div class="tab" style="background:var(--bmo-red)"></div><div class="body" style="background:var(--bmo-red)"></div></div>
+    <div class="icon-shape" style="color:var(--bmo-red)"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M4 4h6v2H4zm0 14h16v2H4zM20 8h2v10h-2zM2 6h2v12H2zm8 0h10v2H10z"/></svg></div>
     <span>music</span>
   </div>
   <div class="icon">
-    <div class="icon-shape"><div class="tab" style="background:var(--bmo-green-dark)"></div><div class="body" style="background:var(--bmo-green-dark)"></div></div>
+    <div class="icon-shape" style="color:var(--bmo-green-dark)"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M4 4h6v2H4zm0 14h16v2H4zM20 8h2v10h-2zM2 6h2v12H2zm8 0h10v2H10z"/></svg></div>
     <span>camera</span>
   </div>
   <div class="icon">
-    <div class="icon-shape"><div class="tab" style="background:var(--bmo-white)"></div><div class="body" style="background:var(--bmo-white)"></div></div>
+    <div class="icon-shape" style="color:var(--bmo-white)"><svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M4 4h6v2H4zm0 14h16v2H4zM20 8h2v10h-2zM2 6h2v12H2zm8 0h10v2H10z"/></svg></div>
     <span>secrets</span>
   </div>
 </div>
@@ -495,9 +538,11 @@ body {
   </div>
   <div class="address-bar">
     <div class="nav-btns">
-      <div class="nav-btn">‹</div>
-      <div class="nav-btn">›</div>
-      <div class="nav-btn">⟳</div>
+      <div class="nav-btn"><svg class="pxi" width="14px" height="14px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M8 13v-2h2v2H8Zm2-2V9h2v2h-2Zm0 4v-2h2v2h-2Zm2-6V7h2v2h-2Zm0 8v-2h2v2h-2Zm2-10V5h2v2h-2Zm0 12v-2h2v2h-2Z"/></svg></div>
+      <div class="nav-btn"><svg class="pxi" width="14px" height="14px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M16 13v-2h-2v2h2Zm-2-2V9h-2v2h2Zm0 4v-2h-2v2h2Zm-2-6V7h-2v2h2Zm0 8v-2h-2v2h2ZM10 7V5H8v2h2Zm0 12v-2H8v2h2Z"/></svg></div>
+      <div class="nav-btn"><svg class="pxi" width="13px" height="13px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M16 4h2v6h-2zm-2-2h2v2h-2zm0 2h2v8h-2zM4 8H2v5h2z"/>
+  <path d="M4 6h16v2H4zm4 14H6v-6h2zm2 2H8v-2h2zm0-2H8v-8h2zm10-4h2v-5h-2z"/>
+  <path d="M20 18H4v-2h16z"/></svg></div>
     </div>
     <div class="url-box">
       <span class="lock"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock-keyhole-icon lucide-lock-keyhole"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg> </span>
@@ -523,21 +568,23 @@ body {
 
 <!-- Mini-player -->
 <div class="mini-player" id="miniPlayer">
-  <span class="mini-player-note">♪</span>
+  <span class="mini-player-note"><svg class="pxi" width="13px" height="13px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M4 12h4v2H4zm-2 2h2v4H2zm2 4h4v2H4zM8 6h2v12H8zm10 0h2v12h-2zm-6 8h2v4h-2zm2-2h4v2h-4zm0 6h4v2h-4zM10 4h8v2h-8z"/></svg></span>
   <div>
     <div class="mini-player-label">now playing</div>
     <div class="mini-player-title">Hotel (UNDERTALE OST) — Toby Fox</div>
   </div>
-  <button class="mini-player-btn" id="musicToggle">II </button>
+  <button class="mini-player-btn" id="musicToggle"><svg class="pxi" width="11px" height="11px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M10 20H4V4h6v16Zm8-16v16h-6V4h6Zm-4 2v12h2V6h-2ZM6 18h2V6H6v12Z"/></svg></button>
 </div>
 
 <!-- Taskbar -->
 <div class="taskbar">
-  <button class="start-btn">⌤ BMO</button>
-  <div class="task-item" id="taskTerminal" onclick="toggleWindow('terminal')">⌘ terminal</div>
-  <div class="task-item task-hidden" id="taskBrowser" onclick="toggleWindow('browser')">⊛ browser</div>
+  <button class="start-btn"><svg class="pxi" width="11px" height="11px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M6 20h12v2H6zM18 6h2v2h-2zM4 6h2v2H4zm2-2h2v2H6zm10 0h2v2h-2zM4 18h2v2H4zm14 0h2v2h-2zM2 8h2v10H2zm18 0h2v10h-2zm-9-6h2v9h-2z"/></svg> BMO</button>
+  <div class="task-item" id="taskTerminal" onclick="toggleWindow('terminal')"><svg class="pxi" width="11px" height="11px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M16 19h2v2H4v-2h10v-2h2v2ZM6 15h8v2H4v2H2v-4h2V5h2v10ZM20 5h2v6h-2v8h-2V5H6V3h14v2Z"/></svg> terminal</div>
+  <div class="task-item task-hidden" id="taskBrowser" onclick="toggleWindow('browser')"><svg class="pxi" width="11px" height="11px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M6 2h12v2H6zm0 18h12v2H6zM4 4h2v2H4zm5 0h2v2H9zm0 14h2v2H9zm4 0h2v2h-2zM7 6h2v12H7zm8 0h2v12h-2zm-2-2h2v2h-2zm7 0h-2v2h2zM2 6h2v12H2zm20 0h-2v12h2zM4 18h2v2H4zm16 0h-2v2h2z"/>
+  <path d="M3 11h18v2H3z"/></svg> browser</div>
 
-  <a class="task-item" id="backTo3D" href="/" style="text-decoration:none;">← 3d room</a>
+  <a class="task-item" id="backTo3D" href="/" style="text-decoration:none;"><svg class="pxi" width="11px" height="11px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/>
+  <path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg> 3d room</a>
   <div class="clock" id="clock">00:00</div>
 </div>
 
@@ -672,9 +719,15 @@ console.log("Hello");
 
 // Clock
 function updateClock(){
-  const d=new Date();
-  document.getElementById('clock').textContent=
-    String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  const d = new Date();
+  const hours = d.getHours();
+  // 12-hour with a meridiem, no leading zero on the hour: 2:30 PM.
+  // Midnight and noon are the cases that break naive %12 arithmetic — 0 has
+  // to read as 12, which is what the || 12 is doing.
+  const h = hours % 12 || 12;
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const meridiem = hours < 12 ? 'AM' : 'PM';
+  document.getElementById('clock').textContent = `${h}:${m} ${meridiem}`;
 }
 updateClock();setInterval(updateClock,10000);
 
@@ -833,28 +886,69 @@ function toggleWindow(name){
 }
 
 const bmoBoot = new Audio('bmo-on.wav');
-const hotelMusic = new Audio('hotel.wav');
-hotelMusic.loop = true;
-hotelMusic.volume = 0.3;
+
+/* === Music ================================================================
+   When this desktop is embedded in the 3D room, the track is NOT played here.
+   The host page owns it, because Web Audio can only process a media element
+   from its own document — and the host needs it in a filter graph so it can
+   sound like it's coming out of BMO's speaker from across the room, then open
+   into clean stereo when you move in. So the mini-player just asks, and the
+   host answers with the resulting state.
+
+   Opened directly (not in an iframe) there is no host, so it falls back to
+   playing the file locally and everything still works. */
+const EMBEDDED = window.parent !== window;
+const musicBtn = document.getElementById('musicToggle');
+const musicNote = document.querySelector('.mini-player-note');
+
+let localMusic = null;
+function getLocalMusic() {
+  if (!localMusic) {
+    localMusic = new Audio('hotel.wav');
+    localMusic.loop = true;
+    localMusic.volume = 0.3;
+  }
+  return localMusic;
+}
+
+const ICON_PAUSE = '<svg class="pxi" width="11px" height="11px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M10 20H4V4h6v16Zm8-16v16h-6V4h6Zm-4 2v12h2V6h-2ZM6 18h2V6H6v12Z"/></svg>';
+const ICON_PLAY  = '<svg class="pxi" width="11px" height="11px" viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M15 11h-2V9h2zm0 4h-2v-2h2zm-2 2h-2v-2h2zm0-8h-2V7h2zm-2-2H9V5h2zM9 21H7V3h2zm6-8h2v-2h-2zm-6 4h2v2H9z"/></svg>';
+
+function paintMusicState(playing) {
+  musicBtn.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+  musicNote.style.animationPlayState = playing ? 'running' : 'paused';
+}
+
+function requestMusic(action) {
+  if (EMBEDDED) {
+    window.parent.postMessage(
+      { source: 'bmo-desktop', type: 'music', action },
+      window.location.origin
+    );
+    return;   // the host replies with the real state
+  }
+  const audio = getLocalMusic();
+  const wantPlay = action === 'play' || (action === 'toggle' && audio.paused);
+  if (wantPlay) audio.play().catch(() => {});
+  else audio.pause();
+  paintMusicState(!audio.paused);
+}
+
+window.addEventListener('message', (event) => {
+  if (event.origin !== window.location.origin) return;
+  const msg = event.data;
+  if (!msg || msg.source !== 'bmo-host' || msg.type !== 'music-state') return;
+  paintMusicState(msg.playing);
+});
+
 window.addEventListener('load', () => {
   bmoBoot.play().catch(() => {});
   bmoBoot.addEventListener('ended', () => {
-    setTimeout(() => { hotelMusic.play().catch(() => {}); }, 200);
+    setTimeout(() => requestMusic('play'), 200);
   }, { once: true });
 });
-document.getElementById('musicToggle').addEventListener('click', () => {
-  const btn = document.getElementById('musicToggle');
-  const note = document.querySelector('.mini-player-note');
-  if (hotelMusic.paused) {
-    hotelMusic.play().catch(() => {});
-    btn.textContent = 'II';
-    note.style.animationPlayState = 'running';
-  } else {
-    hotelMusic.pause();
-    btn.textContent = '▶';
-    note.style.animationPlayState = 'paused';
-  }
-});
+
+musicBtn.addEventListener('click', () => requestMusic('toggle'));
 
 // Football pixel art
 const fc=document.getElementById('footballCanvas');
@@ -873,6 +967,78 @@ fx.fillStyle='#4ac8e8';
 fx.fillRect(22,24,4,3);
 fx.fillStyle='#3da87a';
 fx.fillRect(10,32,4,4);fx.fillRect(26,32,4,4);
+
+/* === Window dragging (Windows 95 rubber band) ==========================
+   The window does not move while you drag it. A stippled outline tracks the
+   pointer and the window jumps to it on release — which is what makes it read
+   as a period desktop rather than a modern drag. */
+(function initWindowDragging(){
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+  document.body.appendChild(ghost);
+
+  let dragWin = null;
+  let startX = 0, startY = 0, originLeft = 0, originTop = 0;
+  let ghostLeft = 0, ghostTop = 0;
+  let topZ = 10;   // .window sits at 5; maximised at 99
+
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  function onDown(e){
+    if (e.button !== 0) return;
+    const win = e.target.closest && e.target.closest('.window');
+    if (!win) return;
+
+    // Any press raises the window, even one that never becomes a drag.
+    win.style.zIndex = ++topZ;
+
+    if (!e.target.closest('.titlebar')) return;         // body presses only focus
+    if (e.target.closest('.titlebar-buttons')) return;  // leave the buttons alone
+    if (win.classList.contains('maximized')) return;    // nothing to drag
+
+    const r = win.getBoundingClientRect();
+    dragWin = win;
+    startX = e.clientX; startY = e.clientY;
+    originLeft = r.left; originTop = r.top;
+    ghostLeft = r.left;  ghostTop = r.top;
+
+    ghost.style.width  = r.width + 'px';
+    ghost.style.height = r.height + 'px';
+    ghost.style.left   = r.left + 'px';
+    ghost.style.top    = r.top + 'px';
+    ghost.style.display = 'block';
+    e.preventDefault();   // stop the titlebar text being selected mid-drag
+  }
+
+  function onMove(e){
+    if (!dragWin) return;
+    const w = ghost.offsetWidth;
+    // You can shove a window most of the way off screen, but never so far
+    // that there's no titlebar left to grab it back by.
+    ghostLeft = clamp(originLeft + (e.clientX - startX), 28 - w, window.innerWidth - 28);
+    ghostTop  = clamp(originTop  + (e.clientY - startY), 0, window.innerHeight - 44);
+    ghost.style.left = ghostLeft + 'px';
+    ghost.style.top  = ghostTop + 'px';
+  }
+
+  function onUp(){
+    if (!dragWin) return;
+    const win = dragWin;
+    dragWin = null;
+    ghost.style.display = 'none';
+
+    win.classList.add('no-anim');
+    win.style.left = ghostLeft + 'px';
+    win.style.top  = ghostTop + 'px';
+    void win.offsetWidth;            // force the layout so removing the class
+    win.classList.remove('no-anim'); // can't get merged into one style pass
+  }
+
+  document.addEventListener('pointerdown', onDown);
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+})();
 
 // Open terminal (show if hidden)
 function openTerminal(){

@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "pixelarticons": "^2.4.1",
     "three": "^0.180.0"
   },
   "devDependencies": {
