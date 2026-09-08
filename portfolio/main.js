@@ -1296,10 +1296,11 @@ const VIEW_DESK  = 'desk';
 const VIEW_BMO   = 'bmo';
 let viewState = VIEW_ROOM;
 
-// Stepping BMO -> DESK is debounced so a pixel of jitter at the edge of his
-// silhouette can't flicker the camera between the two.
-const BMO_EXIT_DELAY_MS = 180;
-let bmoExitTimer = null;
+// Releasing a hover focus is debounced so a pixel of jitter at the edge of the
+// trigger area can't flicker the camera. Shared by BMO and the whiteboard —
+// only one of them can hold the camera at a time.
+const HOVER_EXIT_DELAY_MS = 180;
+let hoverExitTimer = null;
 // Moving in is tested against a tight box around the screen so it takes intent;
 // staying in is tested against a looser one so the edge doesn't flicker. Both
 // are the FACE, never the body — see the VIEW_DESK case in evaluateHoverFocus.
@@ -1639,14 +1640,23 @@ function isPointerOverScreen(margin = 0.18) {
          pointerClient.y >= r.top  - my && pointerClient.y <= r.bottom + my;
 }
 
-function clearBmoExitTimer() {
-  if (bmoExitTimer) { clearTimeout(bmoExitTimer); bmoExitTimer = null; }
+function clearHoverExitTimer() {
+  if (hoverExitTimer) { clearTimeout(hoverExitTimer); hoverExitTimer = null; }
+}
+
+/* Start the debounced release, unless one is already pending. */
+function queueHoverExit(release) {
+  if (hoverExitTimer) return;
+  hoverExitTimer = setTimeout(() => {
+    hoverExitTimer = null;
+    release();
+  }, HOVER_EXIT_DELAY_MS);
 }
 
 /* DESK — BMO's body and the mug. Reached by hovering him from the opening
    view, and by hovering off him from the 2D site. */
 function goToDesk(zoomingIn) {
-  clearBmoExitTimer();
+  clearHoverExitTimer();
   if (isBrowsingScreen) exitBrowseMode();
 
   viewState = VIEW_DESK;
@@ -1671,7 +1681,7 @@ function goToDesk(zoomingIn) {
    plays the intro the first time and goes straight in on every later visit. */
 function goToBmo() {
   if (viewState === VIEW_BMO) return;
-  clearBmoExitTimer();
+  clearHoverExitTimer();
 
   viewState = VIEW_BMO;
   isIntroView = false;
@@ -1789,7 +1799,7 @@ function returnToRoomView() {
   hoverFocusSubject = null;
   // The cursor is probably still sitting on whatever we just left.
   hoverRearmNeeded = true;
-  clearBmoExitTimer();
+  clearHoverExitTimer();
   viewState = VIEW_ROOM;
   isFocusedOnBMO = false;
   isIntroView = false;
@@ -1846,17 +1856,28 @@ function evaluateHoverFocus(hovered) {
     case VIEW_BMO:
       /* Staying is anywhere in the middle of the frame — the screen, the
          bezel, his body. Leaving is the outer band, where the room is. */
-      if (!isPointerInRoomArea()) {
-        clearBmoExitTimer();
-      } else if (!bmoExitTimer) {
-        bmoExitTimer = setTimeout(() => {
-          bmoExitTimer = null;
-          if (viewState === VIEW_BMO) goToDesk(false);
-        }, BMO_EXIT_DELAY_MS);
+      if (isPointerInRoomArea()) {
+        queueHoverExit(() => { if (viewState === VIEW_BMO) goToDesk(false); });
+      } else {
+        clearHoverExitTimer();
       }
       break;
 
     case VIEW_ROOM: {
+      /* Already holding a hover focus in the room — the whiteboard. Same rule
+         as BMO: it releases when the pointer reaches the outer band of the
+         viewport, not the moment it slips off the board itself. Zoomed in, the
+         board covers most of the frame, so "off the board" would fire on the
+         smallest drift. */
+      if (hoverFocusActive) {
+        if (isPointerInRoomArea()) {
+          queueHoverExit(() => { if (hoverFocusActive) returnToRoomView(); });
+        } else {
+          clearHoverExitTimer();
+        }
+        break;
+      }
+
       const subject = hoverSubjectFor(hovered);
       // Clear of everything: re-arm, so leaving and coming back works.
       if (!subject) { hoverRearmNeeded = false; break; }
@@ -2906,8 +2927,18 @@ function animate() {
     camera.position.x = THREE.MathUtils.damp(camera.position.x, focusCameraPosition.x + bmoParallaxCurrent.x, BMO_HOLD_SMOOTHNESS, framePanDt);
     camera.position.y = THREE.MathUtils.damp(camera.position.y, focusCameraPosition.y + bmoParallaxCurrent.y, BMO_HOLD_SMOOTHNESS, framePanDt);
     camera.position.z = THREE.MathUtils.damp(camera.position.z, focusCameraPosition.z + bmoParallaxCurrent.z, BMO_HOLD_SMOOTHNESS, framePanDt);
+    /* Aim through controls.target, damped — the same variable and the same
+       target the flight uses. The flight damps controls.target toward the
+       goal, so it necessarily LAGS; snapping it to the exact value at the
+       handover was a one-frame rotation of the whole remaining lag (~0.56deg
+       at desk distance, about 17px on screen). Carrying the same damped value
+       across the boundary means the aim is continuous and only the rate
+       changes. */
     _panLookAt.copy(focusControlsTarget).add(bmoParallaxCurrent);
-    camera.lookAt(_panLookAt);
+    controls.target.x = THREE.MathUtils.damp(controls.target.x, _panLookAt.x, BMO_HOLD_SMOOTHNESS, framePanDt);
+    controls.target.y = THREE.MathUtils.damp(controls.target.y, _panLookAt.y, BMO_HOLD_SMOOTHNESS, framePanDt);
+    controls.target.z = THREE.MathUtils.damp(controls.target.z, _panLookAt.z, BMO_HOLD_SMOOTHNESS, framePanDt);
+    camera.lookAt(controls.target);
   } else {
     if (!isEscapeAnimating && !isFocusingObject) controls.update();
   }
@@ -3197,9 +3228,20 @@ function animateObjectFocus() {
     if (!isFocusedOnBMO) {
       camera.position.copy(focusCameraPosition);
     }
-    controls.target.copy(focusControlsTarget);
-    camera.lookAt(isFocusedOnBMO ? _focusGoalTgt : controls.target);
-    controls.update();
+
+    /* A BMO view hands over to a damper that keeps aiming through this very
+       variable, so it is deliberately NOT snapped to the exact target here —
+       that snap was the flick at the end of the move. It carries on from
+       wherever the flight left it and closes the remaining lag smoothly.
+
+       Static focuses have no such damper waiting, so they still land exactly.
+       (controls.update() re-runs its own camera.lookAt(controls.target), which
+       is why the aim must agree with the target before it is called.) */
+    if (!isFocusedOnBMO) {
+      controls.target.copy(focusControlsTarget);
+      camera.lookAt(controls.target);
+      controls.update();
+    }
     isFocusingObject = false;
     controls.enabled = true;
     if (onFocusComplete) {
