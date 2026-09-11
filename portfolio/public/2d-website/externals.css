@@ -221,8 +221,8 @@
   }
   .win-terminal .titlebar { background: var(--teal-dim); color: var(--navy); }
   .terminal-lines {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
     line-height: 1.6;
     white-space: pre;
   }
@@ -251,8 +251,8 @@
     image-rendering: pixelated;
   }
   .map-coords {
-    font-family: 'DM Mono', monospace;
-    font-size: 8px;
+    font-family: 'VT323', monospace;
+    font-size: 10px;
     color: var(--teal-dim);
     padding-top: 4px;
   }
@@ -295,8 +295,8 @@
     transition: height 1s ease;
   }
   .bar-label {
-    font-size: 7px;
-    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-family: 'VT323', monospace;
     color: var(--gray-light);
   }
 
@@ -337,8 +337,8 @@
   }
   .clock {
     margin-left: auto;
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
     color: var(--teal-dim);
   }
 
@@ -347,8 +347,8 @@
     position: absolute;
     bottom: 1vh;
     right: 1vw;
-    font-family: 'DM Mono', monospace;
-    font-size: 8px;
+    font-family: 'VT323', monospace;
+    font-size: 10px;
     color: var(--gray);
     z-index: 1;
   }
@@ -558,9 +558,9 @@ background-color: white;
 }
 
 .profile-role {
-    font-size: 13px;
+    font-size: 17px;
     color: var(--gray-light);
-    font-family: 'DM Mono', monospace;
+    font-family: 'VT323', monospace;
     margin-bottom: 12px;
 }
 
@@ -578,9 +578,9 @@ background-color: white;
 }
 
 .status-text {
-    font-size: 13px;
+    font-size: 17px;
     color: var(--green);
-    font-family: 'DM Mono', monospace;
+    font-family: 'VT323', monospace;
 }
 
 .profile-stats {
@@ -593,8 +593,8 @@ background-color: white;
 .profile-stat {
     display: flex;
     justify-content: space-between;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
+    font-family: 'VT323', monospace;
+    font-size: 16px;
     gap: 8px;
 }
 
@@ -618,7 +618,7 @@ background-color: white;
 }
 
 /* Pixel font for the greeting only — .bio-text and everything else in the
-   box keeps inheriting DM Mono from .bio-box below. */
+   box keeps inheriting VT323 from .bio-box below. */
 .bio-greeting {
     font-family: 'Silkscreen', monospace;
     font-size: 18px;
@@ -637,9 +637,9 @@ background-color: white;
     display: flex;
     flex-direction: column;
     line-height: 1.8;
-    font-size: 16px;
+    font-size: 21px;
     letter-spacing: 0.5px;
-    font-family: 'DM Mono', monospace;
+    font-family: 'VT323', monospace;
     word-wrap: break-word;
 }
 
@@ -659,8 +659,8 @@ background-color: white;
     align-items: center;
     gap: 10px;
     margin-bottom: 12px;
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
+    font-family: 'VT323', monospace;
+    font-size: 13px;
     color: #ccc;
 }
 
@@ -709,8 +709,8 @@ background-color: white;
 }
 
 .origin-chapter p {
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
+    font-family: 'VT323', monospace;
+    font-size: 17px;
     line-height: 1.9;
     color: #ccc;
     margin: 0;
@@ -774,7 +774,7 @@ background-color: white;
     padding: 5px 15px;
     font-size: 10px;
     /* Set explicitly: tags inside .bio-box would otherwise inherit its
-       DM Mono and render differently from the ones in project cards. */
+       VT323 and render differently from the ones in project cards. */
     font-family: 'Silkscreen', monospace;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -1017,9 +1017,9 @@ background-color: white;
 /* Matches <p class="text-muted-foreground leading-[2.2] text-[9px]"> */
 .project-desc {
     color: #888; /* text-muted-foreground */
-    font-size: 1rem; /* text-[9px] */
+    font-size: 1.2rem; /* text-[9px] */
     line-height: 2.2; /* leading-[2.2] */
-    font-family: 'DM Mono', monospace;
+    font-family: 'VT323', monospace;
 }
 
 /* Matches <span class="text-primary text-[8px] pixel-box-sm px-2 py-1"> */
@@ -1088,17 +1088,17 @@ background-color: white;
     display: flex;
     justify-content: space-between;
     margin-bottom: 8px;
-    font-family: 'DM Mono', monospace;
+    font-family: 'VT323', monospace;
 }
 
 .skill-name {
     color: #fff;
-    font-size: 9px;
+    font-size: 13px;
 }
 
 .skill-level {
     color: #888888;
-    font-size: 8px;
+    font-size: 11px;
 }
 
 .progress-bg {
@@ -1133,8 +1133,8 @@ background-color: white;
     opacity: 1;
     transition: opacity 0.5s ease;
     color: rgba(255,255,255,0.2);
-    font-size: 10px;
-    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-family: 'VT323', monospace;
     animation: bounceDown 1.8s ease-in-out infinite;
 }
 
@@ -1154,8 +1154,8 @@ background-color: white;
 .skills-summary {
     display: flex;
     gap: 16px;
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
+    font-family: 'VT323', monospace;
+    font-size: 18px;
     color: var(--gray-light);
     margin-bottom: 28px;
     padding-bottom: 14px;
@@ -1185,7 +1185,7 @@ background-color: white;
 
 .skill-category-label {
     font-family: 'Silkscreen', sans-serif;
-    font-size: 9px;
+    font-size: 13px;
     color: var(--secondary);
     margin-bottom: 14px;
     letter-spacing: 1px;
@@ -1198,16 +1198,16 @@ background-color: white;
 }
 
 .skill-flavor {
-    font-family: 'DM Mono', monospace;
-    font-size: 8px;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
     color: var(--levelyellow);
     letter-spacing: 1px;
 }
 
 .skill-level {
     color: #888888;
-    font-size: 8px;
-    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    font-family: 'VT323', monospace;
     min-width: 28px;
     text-align: right;
 }
@@ -1216,8 +1216,8 @@ background-color: white;
 .contact-blurb {
     margin-bottom: 28px;
     padding: 20px 24px;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
+    font-family: 'VT323', monospace;
+    font-size: 16px;
     line-height: 2;
     color: #aaa;
     background: #1a1a1a;
@@ -1245,8 +1245,8 @@ background-color: white;
 }
 
 .contact-field-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
+    font-family: 'VT323', monospace;
+    font-size: 13px;
     color: var(--green);
     letter-spacing: 1px;
 }
@@ -1255,8 +1255,8 @@ background-color: white;
     background: #0d1117;
     border: 2px solid var(--gray);
     color: var(--white);
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
     padding: 10px 14px;
     outline: none;
     transition: border-color 0.15s;
@@ -1319,9 +1319,9 @@ background-color: white;
 }
 
 .contact-icon {
-    font-size: 14px;
+    font-size: 18px;
     color: var(--green);
-    font-family: 'DM Mono', monospace;
+    font-family: 'VT323', monospace;
     letter-spacing: 1px;
 }
 
@@ -1330,16 +1330,16 @@ background-color: white;
 }
 
 .contact-label {
-    font-size: 8px;
+    font-size: 10px;
     color: var(--gray-light);
     letter-spacing: 3px;
-    font-family: 'DM Mono', monospace;
+    font-family: 'VT323', monospace;
 }
 
 .contact-value {
-    font-size: 10px;
+    font-size: 13px;
     color: var(--white);
-    font-family: 'DM Mono', monospace;
+    font-family: 'VT323', monospace;
     overflow-wrap: anywhere;
     word-break: normal;
     line-height: 1.6;
@@ -1727,8 +1727,8 @@ background-color: white;
 .pd-dot.g { background: var(--green); }
 
 .pd-filename {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
     color: var(--gray-light);
     letter-spacing: 0.5px;
 }
@@ -1764,8 +1764,8 @@ background-color: white;
     padding: 80px 20px;
     text-align: center;
     color: var(--gray-light);
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
+    font-family: 'VT323', monospace;
+    font-size: 16px;
 }
 
 .pd-strip {
@@ -1793,8 +1793,8 @@ background-color: white;
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
+    font-family: 'VT323', monospace;
+    font-size: 13px;
     letter-spacing: 1px;
     color: var(--green);
 }
@@ -1807,8 +1807,8 @@ background-color: white;
 }
 
 .pd-desc {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.85rem;
+    font-family: 'VT323', monospace;
+    font-size: 1.02rem;
     line-height: 1.9;
     color: #aaa;
     margin: 0;
@@ -1951,8 +1951,8 @@ background-color: white;
 }
 
 .exp-company {
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
+    font-family: 'VT323', monospace;
+    font-size: 16px;
     color: var(--white);
 }
 
@@ -1980,8 +1980,8 @@ background-color: white;
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
 }
 
 .exp-meta-k {
@@ -1992,8 +1992,8 @@ background-color: white;
 .exp-meta-v { color: var(--white); }
 
 .exp-desc {
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
+    font-family: 'VT323', monospace;
+    font-size: 17px;
     line-height: 1.8;
     color: #ccc;
     margin: 0;
@@ -2024,8 +2024,8 @@ background-color: white;
 }
 
 .exp-future-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
+    font-family: 'VT323', monospace;
+    font-size: 13px;
     letter-spacing: 0.5px;
     color: var(--gray-light);
     font-style: italic;
