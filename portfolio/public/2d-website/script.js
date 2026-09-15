@@ -30,7 +30,7 @@ const projects = [
     {
     title: "beyond education sat simulator",
     desc: "Developed a full-stack SAT test simulator featuring real-time answer syncing, session-based resumption, and automated score calculation to mimic official testing environments.",
-    tech: ["react", "javascript", "tailwind css", "firebase", "firestore"],
+    tech: ["React.js", "javascript", "Tailwind", "Supabase", "GCP"],
     color: "bg-blue",
     preview: "/sat_simulation.mp4",
     },

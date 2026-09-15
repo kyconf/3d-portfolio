@@ -247,14 +247,31 @@ function startLoadingTipCycle() {
   }, 1800);
 }
 
-const isMobile = window.matchMedia('(max-width: 900px), (pointer: coarse)').matches;
+// Device/OS-based check — NOT window size. The old version used
+// `(max-width: 900px)` as an OR condition, which meant a narrow or
+// non-maximized browser window on a real desktop/laptop got flagged as
+// "mobile" and had the 3D option grayed out even though the user had a
+// mouse and a full desktop OS. This checks the actual platform and input
+// capability instead, so resizing a desktop window never changes the
+// result.
+const isMobile = (() => {
+  if (navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean') {
+    return navigator.userAgentData.mobile;
+  }
+  const uaIsMobile = /Android|iPhone|iPad|iPod|IEMobile|Windows Phone|BlackBerry/i.test(navigator.userAgent);
+  // Touch-primary with no hover capability at all (i.e. no mouse) — a
+  // desktop with a touchscreen still has a mouse, so `hover: hover` will
+  // still match there and this stays false.
+  const touchOnly = window.matchMedia('(pointer: coarse) and (hover: none)').matches;
+  return uaIsMobile || touchOnly;
+})();
 
 const titleScreen = document.createElement('div');
 titleScreen.id = 'titleScreen';
 titleScreen.innerHTML = `
   <div class="title-content">
     <div class="title-text">kyle fernandez</div>
-    <div class="title-hint">[ click anywhere to begin  ]</div>
+    <div class="title-hint${isMobile ? ' is-expanded' : ''}">[<span class="hint-text"> click anywhere to begin </span>]</div>
   </div>
 `;
 titleScreen.style.cssText = `
@@ -322,6 +339,22 @@ titleStyle.innerHTML = `
     letter-spacing: 3px;
     opacity: 0.55;
     animation: titleHintPulse 1.6s ease-in-out infinite;
+    white-space: nowrap;
+  }
+  #titleScreen .title-hint .hint-text{
+    display: inline-block;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    white-space: nowrap;
+    vertical-align: bottom;
+    transition: max-width 0.45s ease-in-out, opacity 0.3s ease;
+  }
+  #titleScreen:hover .title-hint .hint-text,
+  #titleScreen:focus-visible .title-hint .hint-text,
+  #titleScreen .title-hint.is-expanded .hint-text{
+    max-width: 320px;
+    opacity: 1;
   }
   @keyframes titleHintPulse{
     0%, 100% { opacity: 0.55; }
