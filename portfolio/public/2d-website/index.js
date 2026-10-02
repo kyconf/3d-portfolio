@@ -13,12 +13,13 @@ for (let i = 0; i < 80; i++) {
 }
 
 // Clock
+const clock = document.getElementById('clock');
 function updateClock(){
   const d=new Date();
-  document.getElementById('clock').textContent =
+  clock.textContent =
     String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 }
-updateClock(); setInterval(updateClock,10000);
+if (clock) { updateClock(); setInterval(updateClock,10000); }
 
 // Terminal typing
 const lines = [
@@ -63,10 +64,11 @@ function typeLine(){
   li++;
   setTimeout(typeLine, 60 + Math.random()*40);
 }
-setTimeout(typeLine, 400);
+if (term) setTimeout(typeLine, 400);
 
 
 const cv = document.getElementById('mapCanvas');
+if (cv) {
 const ctx = cv.getContext('2d');
 const cw=cv.width, ch=cv.height;
 const mapColors = ['#0d2847','#1a3a5a','#4a3a1a','#2d6b4f','#3d8b63','#6b5a2d','#e8e8e8'];
@@ -87,14 +89,13 @@ for(let y=0;y<ch;y+=2){
     ctx.fillRect(x,y,2,2);
   }
 }
-console.log("Hello");
+}
+// Only the legacy splash uses Enter to continue. Keep normal keyboard
+// navigation (including the return dialog) intact on the portfolio page.
+if (document.querySelector('.name2.typography2')) {
 document.addEventListener('keydown', (event) => {
-  // Check if the key pressed is Enter
   if (event.key === 'Enter') {
-    // Optional: Add a small sound effect or a quick flash here
-    console.log('Booting PXOS...');
-    
-    // Redirect to your main portfolio page
     window.location.href = '/2d-website/';
   }
 });
+}

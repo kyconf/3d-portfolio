@@ -204,7 +204,10 @@ function closeProjectDetail() {
 }
 
 function escClose(e) {
-    if (e.key === "Escape") closeProjectDetail();
+    if (e.key === "Escape") {
+        e.preventDefault();
+        closeProjectDetail();
+    }
 }
 
 function slug(str) {
@@ -376,11 +379,12 @@ function hideScrollHint() {
     });
 
     yesBtn.addEventListener('click', () => {
-        // main.js sets this when it hands off to the 2D site; clear it so the
-        // start screen shows the picker instead of bouncing straight back.
-        try { sessionStorage.removeItem('reload3DOnReturn'); } catch (_) {}
-        window.location.href = '/';
+        close();
+        if (window.portfolioNavigation) window.portfolioNavigation.go('/');
+        else window.location.assign('/');
     });
+
+    nameEl.addEventListener('pointerenter', () => window.portfolioNavigation?.prefetch('/'), { once: true });
 
     noBtn.addEventListener('click', close);
 
@@ -390,6 +394,9 @@ function hideScrollHint() {
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !overlay.hidden) close();
+        if (e.key === 'Escape' && !overlay.hidden) {
+            e.preventDefault();
+            close();
+        }
     });
 })();

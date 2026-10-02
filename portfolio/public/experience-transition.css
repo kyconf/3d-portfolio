@@ -1,0 +1,43 @@
+/* A shared cover bridges the two documents without revealing an empty canvas. */
+.experience-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: grid;
+  place-content: center;
+  gap: 20px;
+  background: #0a1530;
+  color: #c9f4df;
+  text-align: center;
+  font: 11px/1.5 'Courier New', monospace;
+  letter-spacing: 3px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 420ms cubic-bezier(.22, 1, .36, 1), visibility 0s 420ms;
+}
+
+.experience-transition::before {
+  content: '';
+  width: 30px;
+  height: 3px;
+  margin: 0 auto;
+  background: #c9f4df;
+  box-shadow: -10px 0 #3da87a, 10px 0 #3da87a;
+}
+
+.experience-arriving .experience-transition,
+.experience-leaving .experience-transition {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 280ms cubic-bezier(.4, 0, .2, 1);
+}
+
+/* The incoming cover must be opaque on its first paint. */
+.experience-arriving .experience-transition { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .experience-transition { transition: none; }
+  .experience-leaving .experience-transition { transition: none; }
+}
