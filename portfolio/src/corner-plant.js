@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-// A small procedural floor plant. The pot rests at local y = 0 so placement
-// only needs the floor height; all foliage moves from its roots in the soil.
+// A compact trailing shelf plant. The pot rests at local y = 0 and its vines
+// grow toward +X, over the front of the bookcase and into the room.
 export function createCornerPlant() {
   const group = new THREE.Group();
   group.name = 'CornerPlant';
@@ -46,16 +46,16 @@ export function createCornerPlant() {
   // Eight sides keep the silhouette in the same faceted style as the room.
   // The raised lip and recessed soil make the pot read as an open vessel.
   const pot = mergedMesh([
-    colored(new THREE.CylinderGeometry(0.258, 0.188, 0.32, 8, 1, true), 0xa86b4e,
-      new THREE.Matrix4().makeTranslation(0, 0.194, 0)),
-    colored(new THREE.CylinderGeometry(0.275, 0.275, 0.052, 8, 1, true), 0xc38761,
-      new THREE.Matrix4().makeTranslation(0, 0.356, 0)),
-    colored(new THREE.RingGeometry(0.238, 0.275, 8).rotateX(-Math.PI / 2), 0xd29971,
-      new THREE.Matrix4().makeTranslation(0, 0.382, 0)),
-    colored(new THREE.CylinderGeometry(0.237, 0.237, 0.018, 8), 0x34261f,
-      new THREE.Matrix4().makeTranslation(0, 0.343, 0)),
-    colored(new THREE.CylinderGeometry(0.28, 0.252, 0.034, 8), 0x86513d,
-      new THREE.Matrix4().makeTranslation(0, 0.017, 0)),
+    colored(new THREE.CylinderGeometry(0.18, 0.135, 0.23, 8, 1, true), 0xa47759,
+      new THREE.Matrix4().makeTranslation(0, 0.14, 0)),
+    colored(new THREE.CylinderGeometry(0.194, 0.194, 0.035, 8, 1, true), 0xb68a68,
+      new THREE.Matrix4().makeTranslation(0, 0.2575, 0)),
+    colored(new THREE.RingGeometry(0.17, 0.194, 8).rotateX(-Math.PI / 2), 0xc49672,
+      new THREE.Matrix4().makeTranslation(0, 0.275, 0)),
+    colored(new THREE.CylinderGeometry(0.169, 0.169, 0.012, 8), 0x392e24,
+      new THREE.Matrix4().makeTranslation(0, 0.255, 0)),
+    colored(new THREE.CylinderGeometry(0.205, 0.183, 0.025, 8), 0x8f664e,
+      new THREE.Matrix4().makeTranslation(0, 0.0125, 0)),
   ], 'CornerPlant_Pot');
   group.add(pot);
 
@@ -63,11 +63,11 @@ export function createCornerPlant() {
   // textures, alpha blending, or a dense mesh. Each leaf is just 16 triangles.
   function leafGeometry(length, width) {
     const rows = [
-      [0, 0.012, 0],
-      [0.24, width * 0.44, 0.02],
-      [0.53, width * 0.5, 0.055],
-      [0.79, width * 0.33, 0.052],
-      [1, 0, -0.025],
+      [0, 0.005, 0],
+      [0.22, width * 0.46, 0.008],
+      [0.48, width * 0.5, 0.014],
+      [0.76, width * 0.3, 0.01],
+      [1, 0, -0.008],
     ];
     const positions = [];
     for (let i = 0; i < rows.length - 1; i += 1) {
@@ -88,45 +88,90 @@ export function createCornerPlant() {
     return geometry;
   }
 
-  // angle, stem height, blade length, blade width, outward tilt, leaf color.
-  // Fixed variation gives a lush silhouette without random changes on reload.
-  const leaves = [
-    [0.25, 0.52, 0.48, 0.255, 0.88, 0x4f8750],
-    [1.25, 0.34, 0.43, 0.225, 1.05, 0x659655],
-    [2.15, 0.63, 0.51, 0.26, 0.62, 0x467b48],
-    [3.15, 0.41, 0.45, 0.235, 0.92, 0x58884b],
-    [4.12, 0.72, 0.48, 0.235, 0.39, 0x6a9955],
-    [5.08, 0.47, 0.49, 0.255, 0.86, 0x3d7045],
-    [5.88, 0.67, 0.46, 0.23, 0.42, 0x57864c],
+  const leafColors = [0x778e59, 0x879968, 0x647d50, 0x95a578, 0x738b5b];
+  const up = new THREE.Vector3(0, 1, 0);
+
+  function stem(start, end, radius = 0.005) {
+    const direction = end.clone().sub(start);
+    const transform = new THREE.Matrix4().compose(
+      start.clone().add(end).multiplyScalar(0.5),
+      new THREE.Quaternion().setFromUnitVectors(up, direction.clone().normalize()),
+      new THREE.Vector3(1, 1, 1),
+    );
+    return colored(new THREE.CylinderGeometry(radius, radius, direction.length(), 5, 1, true),
+      0x66764a, transform);
+  }
+
+  function addLeaf(parts, anchor, direction, length, width, color) {
+    const growth = new THREE.Vector3(...direction).normalize();
+    const base = anchor.clone().addScaledVector(growth, 0.025);
+    parts.push(stem(anchor, base, 0.0035));
+    // Orient each blade upward and inward, with its fold catching the light.
+    const side = growth.clone().cross(up).normalize();
+    const normal = side.clone().cross(growth).normalize();
+    const transform = new THREE.Matrix4().makeBasis(side, growth, normal);
+    transform.setPosition(base);
+    parts.push(colored(leafGeometry(length * 1.1, width * 1.3), color, transform));
+  }
+
+  // Each path clears the shelf's +X edge before dropping below the pot base.
+  // No branch grows backward into the wall. Uneven lengths make the trailing
+  // silhouette natural, while keeping the shape deterministic on reload.
+  const paths = [
+    [[-0.01, 0, -0.045], [0.15, 0.13, -0.07], [0.31, 0.02, -0.12],
+      [0.39, -0.2, -0.15], [0.42, -0.42, -0.1], [0.48, -0.69, -0.15]],
+    [[0.025, 0, 0.02], [0.18, 0.11, 0.02], [0.32, 0, 0.05],
+      [0.4, -0.23, 0.04], [0.5, -0.48, 0.12], [0.49, -0.82, 0.08]],
+    [[0.01, 0.01, 0.06], [0.16, 0.15, 0.13], [0.34, -0.01, 0.22],
+      [0.49, -0.18, 0.24], [0.54, -0.46, 0.29]],
   ];
-  const stalks = leaves.map(([angle, height, length, width, tilt, color], index) => {
-    const outward = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
-    const tip = outward.clone().multiplyScalar(0.1 + height * 0.08);
-    tip.y = height;
-    const curve = new THREE.CatmullRomCurve3([
-      outward.clone().multiplyScalar(0.025),
-      new THREE.Vector3(tip.x * 0.3, height * 0.52, tip.z * 0.3),
-      tip,
-    ]);
-    const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt, angle, 0, 'YXZ'));
-    const leafTransform = new THREE.Matrix4().compose(tip, rotation, new THREE.Vector3(1, 1, 1));
-    const stalk = mergedMesh([
-      colored(new THREE.TubeGeometry(curve, 4, 0.009, 4, false), 0x4d7041),
-      colored(leafGeometry(length, width), color, leafTransform),
-    ], `CornerPlant_Leaf_${index + 1}`);
-    stalk.position.y = 0.35;
+  const stalks = paths.map((path, branchIndex) => {
+    const points = path.map((point) => new THREE.Vector3(...point));
+    const parts = [];
+    for (let index = 1; index < points.length; index += 1) {
+      parts.push(stem(points[index - 1], points[index]));
+      const sign = (index + branchIndex) % 2 === 0 ? 1 : -1;
+      addLeaf(parts, points[index], [0.82, index < 2 ? 0.28 : -0.32, sign * 0.55],
+        0.18 + (index % 3) * 0.018, 0.125 + (index % 2) * 0.025,
+        leafColors[(index + branchIndex) % leafColors.length]);
+      if (index < points.length - 1) {
+        const opposite = points[index - 1].clone().lerp(points[index], 0.64);
+        addLeaf(parts, opposite, [0.9, 0.04, -sign * 0.5],
+          0.16, 0.12, leafColors[(index + branchIndex + 2) % leafColors.length]);
+      }
+    }
+    const stalk = mergedMesh(parts, `CornerPlant_Vine_${branchIndex + 1}`);
+    stalk.position.y = 0.26;
     group.add(stalk);
     return stalk;
   });
+
+  // A few short upright stems fill the top of the pot, all leaning inward.
+  const crownParts = [];
+  const crown = [
+    [[0.09, 0.18, -0.1], [0.7, 0.45, -0.3], 0.2, 0.15],
+    [[0.06, 0.24, 0.01], [0.72, 0.4, 0.12], 0.19, 0.15],
+    [[0.11, 0.15, 0.12], [0.8, 0.18, 0.5], 0.2, 0.15],
+    [[0.015, 0.13, -0.015], [0.75, 0.52, -0.05], 0.17, 0.135],
+  ];
+  crown.forEach(([point, direction, length, width], index) => {
+    const tip = new THREE.Vector3(...point);
+    crownParts.push(stem(new THREE.Vector3(0, 0, point[2] * 0.2), tip));
+    addLeaf(crownParts, tip, direction, length, width, leafColors[index]);
+  });
+  const crownMesh = mergedMesh(crownParts, 'CornerPlant_Crown');
+  crownMesh.position.y = 0.26;
+  group.add(crownMesh);
+  stalks.push(crownMesh);
 
   return {
     group,
     update(elapsed, motionEnabled = true) {
       stalks.forEach((stalk, index) => {
-        // About one degree: enough to feel a soft breeze, while the pot stays
-        // planted. Zeroing the rotations also handles preference changes.
-        stalk.rotation.x = motionEnabled ? Math.sin(elapsed * 0.72 + index * 1.17) * 0.014 : 0;
-        stalk.rotation.z = motionEnabled ? Math.sin(elapsed * 0.53 + index * 0.83) * 0.012 : 0;
+        // Slow, small movement keeps the pot anchored and the shelf readable.
+        // Zeroing rotations also handles a live reduced-motion preference change.
+        stalk.rotation.x = motionEnabled ? Math.sin(elapsed * 0.64 + index * 1.17) * 0.012 : 0;
+        stalk.rotation.z = motionEnabled ? Math.sin(elapsed * 0.47 + index * 0.83) * 0.009 : 0;
       });
     },
     dispose() {

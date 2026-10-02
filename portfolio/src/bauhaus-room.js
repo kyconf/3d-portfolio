@@ -23,11 +23,12 @@ export function applyBauhausStyle(model) {
     return material;
   };
   const ivory = makeMaterial('Ivory', 0xf0ebde, { roughness: 0.88 });
-  const cobalt = makeMaterial('Cobalt', 0x244ebd, { roughness: 0.4 });
-  const textileBlue = makeMaterial('BlueTextile', 0x2b50b0, { roughness: 0.97 });
+  const olive = makeMaterial('Olive', 0x596b49, { roughness: 0.8 });
+  const rugSage = makeMaterial('SageTextile', 0x778467, { roughness: 0.97 });
+  const throwClay = makeMaterial('ClayTextile', 0xb07355, { roughness: 0.98 });
   const textileIvory = makeMaterial('IvoryTextile', 0xece4d0, { roughness: 0.98 });
-  const red = makeMaterial('Vermilion', 0xd94228, { roughness: 0.34 });
-  const yellow = makeMaterial('Mustard', 0xe0b54d, { roughness: 0.92 });
+  const terracotta = makeMaterial('Terracotta', 0xb85f3e, { roughness: 0.42 });
+  const ochre = makeMaterial('Ochre', 0xc7a05a, { roughness: 0.92 });
   const charcoal = makeMaterial('Charcoal', 0x252927, { roughness: 0.55 });
   // A little diffuse response keeps the tubing readable without an HDR map.
   const chrome = makeMaterial('SatinChrome', 0xb9c8cd, { metalness: 0.68, roughness: 0.24 });
@@ -65,12 +66,10 @@ export function applyBauhausStyle(model) {
     object.visible = false;
   }
 
-  // Floors, the desk top, window surround and upper room frame retain their
-  // original wood. Apply finishes to individual nodes, not shared materials.
+  // Floors, bookshelf, desk top, window surround and upper room frame retain
+  // their original wood. Apply finishes to nodes, not shared materials.
   replace('Wall', ivory);
   replace('07262005', ivory); // individual blind slats
-  replace('Cube.014', cobalt); // bookcase sides and back
-  replace('Plane.004', ivory); // existing shelf boards
   replace('Cube', ivory); // desk drawer cabinet
   replace('Plane.002', ivory); // desk drawer fronts
   replace('Plane.001', ivory); // right desk support, opposite the drawer cabinet
@@ -113,11 +112,7 @@ export function applyBauhausStyle(model) {
     add(geometry, chrome, from.add(to).multiplyScalar(0.5).toArray());
   }
 
-  // Fine tubular edges give the bookcase the open, chrome-framed character of
-  // the reference while retaining every shelf and all the objects on them.
-  tube([-1.522, 0.735, -2.155], [-1.522, 4.135, -2.155]);
-  tube([-1.522, 0.735, -0.34], [-1.522, 4.135, -0.34]);
-  tube([-1.522, 4.135, -2.155], [-1.522, 4.135, -0.34]);
+  // One thin metal edge accents the desk; the bookcase keeps its wooden frame.
   tube([-1.105, 1.482, -0.2], [-1.105, 1.482, 2.25], 0.018);
 
   // Rectangular wool rug with a quiet, regular ivory grid. The original round
@@ -126,7 +121,7 @@ export function applyBauhausStyle(model) {
   const rugCenter = [0.2, 0.539, 0.88];
   const rugWidth = 2.5;
   const rugDepth = 2.12;
-  box(rugWidth, 0.015, rugDepth, textileBlue, rugCenter);
+  box(rugWidth, 0.015, rugDepth, rugSage, rugCenter);
   for (let i = 0; i <= 10; i += 1) {
     box(0.009, 0.0015, rugDepth - 0.09, textileIvory,
       [rugCenter[0] - rugWidth / 2 + 0.045 + i * (rugWidth - 0.09) / 10, 0.5475, rugCenter[2]]);
@@ -136,23 +131,23 @@ export function applyBauhausStyle(model) {
       [rugCenter[0], 0.5475, rugCenter[2] - rugDepth / 2 + 0.045 + i * (rugDepth - 0.09) / 8]);
   }
 
-  // A folded cobalt throw and a single ochre cushion soften the geometric bed.
+  // Clay bedding and an ochre cushion balance the sage rug and green foliage.
   // The short end of the throw continues over the front edge of the mattress.
-  box(0.49, 0.017, 1.68, textileBlue, [0.89, 1.513, -1.235]);
-  box(0.49, 0.32, 0.018, textileBlue, [0.89, 1.353, -0.388]);
+  box(0.49, 0.017, 1.68, throwClay, [0.89, 1.513, -1.235]);
+  box(0.49, 0.32, 0.018, throwClay, [0.89, 1.353, -0.388]);
   box(0.027, 0.019, 1.68, textileIvory, [1.07, 1.515, -1.235]);
   box(0.027, 0.32, 0.02, textileIvory, [1.07, 1.353, -0.386]);
   const cushion = new THREE.BoxGeometry(0.32, 0.12, 0.41, 1, 1, 1);
-  add(cushion, yellow, [-1.04, 1.445, -1.25], [0, -0.12, 0]);
+  add(cushion, ochre, [-1.04, 1.445, -1.25], [0, -0.12, 0]);
 
   // Replace just the lowest poster with a small original geometric composition.
   // The two photographs and the hand-written whiteboard remain as they are.
   hide('Plane.008');
   box(0.675, 0.675, 0.027, charcoal, [1.869, 2.233, -2.168]);
   box(0.633, 0.633, 0.006, ivory, [1.869, 2.233, -2.151]);
-  add(new THREE.CircleGeometry(0.142, 40), red, [1.762, 2.345, -2.146]);
-  box(0.113, 0.287, 0.002, yellow, [2.057, 2.324, -2.145]);
-  add(new THREE.CircleGeometry(0.21, 40, 0, Math.PI), cobalt, [1.859, 2.036, -2.143]);
+  add(new THREE.CircleGeometry(0.142, 40), terracotta, [1.762, 2.345, -2.146]);
+  box(0.113, 0.287, 0.002, ochre, [2.057, 2.324, -2.145]);
+  add(new THREE.CircleGeometry(0.21, 40, 0, Math.PI), olive, [1.859, 2.036, -2.143]);
   box(0.43, 0.024, 0.002, charcoal, [1.86, 2.006, -2.14]);
 
   // A compact mushroom lamp sits on the original desk. Keep the old nodes and
@@ -161,9 +156,9 @@ export function applyBauhausStyle(model) {
   hide('BézierCurve');
   const lampX = -1.84;
   const lampZ = 0.015;
-  add(new THREE.CylinderGeometry(0.165, 0.185, 0.055, 24), red, [lampX, 1.693, lampZ]);
-  add(new THREE.CylinderGeometry(0.065, 0.085, 0.315, 20), red, [lampX, 1.865, lampZ]);
-  add(new THREE.SphereGeometry(0.272, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), red,
+  add(new THREE.CylinderGeometry(0.165, 0.185, 0.055, 24), terracotta, [lampX, 1.693, lampZ]);
+  add(new THREE.CylinderGeometry(0.065, 0.085, 0.315, 20), terracotta, [lampX, 1.865, lampZ]);
+  add(new THREE.SphereGeometry(0.272, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), terracotta,
     [lampX, 2.014, lampZ]);
   add(new THREE.CircleGeometry(0.266, 28), globe, [lampX, 2.013, lampZ], [Math.PI / 2, 0, 0]);
 

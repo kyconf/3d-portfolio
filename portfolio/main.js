@@ -1045,7 +1045,7 @@ const NIGHT_PALETTE = {
 };
 
 const DAY_PALETTE = {
-  background:        new THREE.Color(0xcbd5df),
+  background:        new THREE.Color(0xd7cec0),
   beamColor:         new THREE.Color(0xffb050),
   beamIntensity:     2.6,
   moonColor:         new THREE.Color(0xb8d0e8),
@@ -2006,7 +2006,8 @@ function startSceneLoad() {
     bulbMesh.visible = false;
 
     cornerPlant = createCornerPlant();
-    cornerPlant.group.position.set(1.91, 0.521, 0.32);
+    // The bookshelf faces +X: foliage trails over its front into the room.
+    cornerPlant.group.position.set(-1.85, 4.146, -0.68);
     scene.add(cornerPlant.group);
 
 
