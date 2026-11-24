@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>kyle's 2D | co-op</title>
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500&family=Silkscreen&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/2d-website/externals.css">
+<!-- Co-op-only styles, loaded after the shared sheet -->
+<link rel="stylesheet" href="/2d-website/co-op/co-op.css">
+<link rel="icon" type="image/png" href="/bmoicon2.png">
+</head>
+<body>
+
+<div class="titleName">
+ <h1 id="myName" role="button" tabindex="0" aria-label="Return to the main portfolio" title="back to start"> KYLE_FERNANDEZ </h1>
+ <h2 id="desc" class="typography3"> full stack developer </h2>
+</div>
+
+<!-- Leave-site confirmation -->
+<div class="confirm-overlay" id="homeConfirm" hidden>
+  <div class="confirm-box pixel-box" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmBody">
+    <div class="color-strip bg-primary"></div>
+    <h3 class="confirm-title" id="confirmTitle">// LEAVE THE 2D SITE?</h3>
+    <p class="confirm-body" id="confirmBody">
+      This will send you back to the start screen, where you can load the
+      full 3D room or come back here.
+    </p>
+    <p class="confirm-note">// the 3D room is graphics-heavy and takes a moment to load</p>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-btn confirm-yes" id="homeConfirmYes">[ TAKE ME THERE ]</button>
+      <button type="button" class="confirm-btn confirm-no" id="homeConfirmNo">[ STAY HERE ]</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+<div class="nav-container">
+    <nav class="nav-bar">
+        <a class="nav-item active" data-target="about">ABOUT</a>
+        <a class="nav-item" data-target="whyme">WHY ME</a>
+        <a class="nav-item" data-target="goals">GOALS</a>
+        <a class="nav-item" data-target="projects">PROJECTS</a>
+        <a class="nav-item" data-target="experience">EXPERIENCE</a>
+        <a class="nav-item" data-target="skills">SKILLS</a>
+        <a class="nav-item" data-target="contact">CONTACT</a>
+    </nav>
+</div>
+
+
+
+<main class="content-section">
+    <div id="about" class="page-section">
+        <h2 class="section-title"><span class="animarrow">>    </span>ABOUT ME</h2>
+        <div class="about-grid">
+
+            <!-- Left: profile card -->
+            <div class="profile-card pixel-box">
+                <div class="pixel-art-placeholder" style="position:relative;overflow:hidden;margin-bottom:-10px;">
+                    <!-- HD photo underneath -->
+                    <img src="/2d-website/profile1.jpg" alt="Profile Photo" class="avatar-img avatar-hd">
+                    <!-- Pixel art on top, fades out after load -->
+                    <img src="/2d-website/pxArt.png" alt="Pixel Avatar" class="avatar-img avatar-pixel">
+                </div>
+                <div class="profile-info">
+                    <p class="profile-name">KYLE_FERNANDEZ</p>
+                    <p class="profile-role">// full stack dev</p>
+                    <div class="profile-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">online</span>
+                    </div>
+                </div>
+                <div class="profile-stats">
+                    <div class="profile-stat"><span class="stat-k">LOC</span><span class="stat-v">Toronto, CA</span></div>
+                    <div class="profile-stat"><span class="stat-k">EDU</span><span class="stat-v">York University</span></div>
+                    <div class="profile-stat"><span class="stat-k">GRAD</span><span class="stat-v">June 2028</span></div>
+                </div>
+                <a href="/RESUME.pdf" download class="resume-btn"> RESUME</a>
+            </div>
+
+            <div class="about-right">
+                <div class="pixel-box bio-box">
+                    <p class="bio-greeting">Hey! I'm Kyle</p>
+                    <p class="bio-text">A full stack developer who likes to dabble in a lot of things cool. Engineering, 3D modeling, games, cybersecurity — if it's interesting, I'm probably exploring it. Ask me anything, from anything to why I do what I do!</p>
+                    <br>
+                    
+                    <p><i>"When you're curious, you find plenty of interesting things to do." -Walt Disney</i></p>
+                    <div class="tag-container">
+                        <span class="tag">cybersecurity</span>
+                        <span class="tag">ai</span>
+                        <span class="tag">3d modeling</span>
+                        <span class="tag">game dev</span>
+                        <span class="tag">engineering</span>
+                        <span class="tag">bouldering</span>
+                        <span class="tag">music</span>
+                        <span class="tag">piano/guitar/banduria</span>
+                    </div>
+                </div>
+
+                <div class="pixel-box quest-box">
+                    <p class="stat-header">⚔ ACTIVE QUESTS</p>
+                    <div class="quest-item">
+                        <span class="quest-dot"></span>
+                        <span class="quest-text">BSc Specialized Honors Computer Security @ York University</span>
+                    </div>
+                    <div class="quest-item">
+                        <span class="quest-dot"></span>
+                        <span class="quest-text">Improving the IRL Interactive BMO-bot</span>
+                    </div>
+                    <div class="quest-item">
+                        <span class="quest-dot"></span>
+                        <span class="quest-text">Learning more about AI / ML & Networks</span>
+                    </div>
+
+                    <p class="stat-header quest-header--done">✔ COMPLETED</p>
+                    <div class="quest-item quest-item--done">
+                        <span class="quest-dot"></span>
+                        <span class="quest-text">CompTIA Security+ Certification</span>
+                    </div>
+                    <div class="quest-item quest-item--done">
+                        <span class="quest-dot"></span>
+                        <span class="quest-text">Microsoft Azure Fundamentals (AZ-900) Certification</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- WHY ME (co-op only) -->
+    <div id="whyme" class="page-section" style="display: none;">
+        <h2 class="section-title"><span class="animarrow">> </span> WHY ME</h2>
+        <div class="pixel-box bio-box whyme-intro">
+            <div class="color-strip bg-primary"></div>
+            <p class="bio-greeting">The short version</p>
+            <p class="bio-text">I build things because I'm curious, and I build things to make life easier for myself and others. That's how a Raspberry Pi turned into a talking BMO, and how a vulnerability scanner turned into a pen-testing pipeline. I bring that same energy to a team.</p>
+        </div>
+        <div class="whyme-grid">
+            <div class="pixel-box whyme-card">
+                <div class="color-strip bg-primary"></div>
+                <p class="whyme-num">01</p>
+                <h3 class="whyme-title">Ships Real Projects</h3>
+                <p class="whyme-text">Full-stack apps, a computer-vision ASL interpreter, a CVE risk-report pipeline and a hardware BMO-bot.</p>
+                <div class="tag-container">
+                    <span class="tag">next.js</span>
+                    <span class="tag">python</span>
+                    <span class="tag">fastapi</span>
+                    <span class="tag">opencv</span>
+                </div>
+            </div>
+            <div class="pixel-box whyme-card">
+                <div class="color-strip bg-secondary"></div>
+                <p class="whyme-num">02</p>
+                <h3 class="whyme-title">Security Mindset</h3>
+                <p class="whyme-text">Studying Computer Security at York and hold CompTIA Security+. I think about how things break while I'm building them.</p>
+                <div class="tag-container">
+                    <span class="tag">security+</span>
+                    <span class="tag">nmap</span>
+                    <span class="tag">metasploit</span>
+                    <span class="tag">cve / cvss</span>
+                </div>
+            </div>
+            <div class="pixel-box whyme-card">
+                <div class="color-strip bg-accent"></div>
+                <p class="whyme-num">03</p>
+                <h3 class="whyme-title">Real Enterprise Experience</h3>
+                <p class="whyme-text">Modern Workplace Analyst Intern at EQ Bank, working with Intune, Entra, Defender and conditional access. I present PoCs to teams and help deploy and test applications.</p>
+                <div class="tag-container">
+                    <span class="tag">intune</span>
+                    <span class="tag">entra</span>
+                    <span class="tag">defender</span>
+                    <span class="tag">powershell</span>
+                </div>
+            </div>
+            <div class="pixel-box whyme-card">
+                <div class="color-strip bg-destructive"></div>
+                <p class="whyme-num">04</p>
+                <h3 class="whyme-title">Creative Thinking</h3>
+                <p class="whyme-text">You're on a 2D site inside a 3D room I modelled in Blender.</p>
+                <div class="tag-container">
+                    <span class="tag">three.js</span>
+                    <span class="tag">blender</span>
+                    <span class="tag">game dev</span>
+                </div>
+            </div>
+            <div class="pixel-box whyme-card">
+                <div class="color-strip bg-purple"></div>
+                <p class="whyme-num">05</p>
+                <h3 class="whyme-title">Follows Through</h3>
+                <p class="whyme-text">Co-authored a published research paper on plywood made from Philippine mahogany and gmelina.</p>
+                <div class="tag-container">
+                    <span class="tag">research</span>
+                    <span class="tag">publication</span>
+                </div>
+            </div>
+            <div class="pixel-box whyme-card">
+                <div class="color-strip bg-blue"></div>
+                <p class="whyme-num">06</p>
+                <h3 class="whyme-title">Easy to Work With</h3>
+                <p class="whyme-text">I explain technical work clearly, ask good questions and pick up new tools fast. Outside code, I boulder and play piano, guitar and banduria.</p>
+                <div class="tag-container">
+                    <span class="tag">communication</span>
+                    <span class="tag">teamwork</span>
+                    <span class="tag">fast learner</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GOALS (co-op only) — from S.M.A.R.T. Personal Development Goals, Oct 11, 2026 -->
+    <div id="goals" class="page-section" style="display: none;">
+        <h2 class="section-title"><span class="animarrow">> </span> GOALS</h2>
+        <div class="pixel-box bio-box goals-intro">
+            <p class="bio-text">Three competencies, each with one academic and one workplace S.M.A.R.T. goal, set for my work term as a Modern Workplace Analyst (Sep 8 to Dec 29, 2026). The workplace goals were set with my manager.</p>
+        </div>
+        <div class="whyme-grid goals-grid">
+            <div class="pixel-box goal-card">
+                <div class="color-strip bg-primary"></div>
+                <p class="whyme-num">COMPETENCY 01</p>
+                <h3 class="whyme-title">Critical Thinking &amp; Problem-Solving</h3>
+                <div class="goal-item">
+                    <div class="goal-item-top">
+                        <span class="goal-kind">// ACADEMIC</span>
+                    </div>
+                    <p class="whyme-text">Use a four-step method (define the problem, list knowns and unknowns, plan, test) on every programming assignment and lab, log the errors I hit and how I fixed them, and raise my assignment average by at least 10 points over my first three Fall 2026 assignments.</p>
+                </div>
+                <div class="goal-item">
+                    <div class="goal-item-top">
+                        <span class="goal-kind">// WORKPLACE</span>
+                    </div>
+                    <p class="whyme-text">Analyze my team's support tickets to find the three most common Microsoft 365 issues, identify the root cause of each, and present my manager with at least one recommended fix per issue.</p>
+                </div>
+            </div>
+            <div class="pixel-box goal-card">
+                <div class="color-strip bg-secondary"></div>
+                <p class="whyme-num">COMPETENCY 02</p>
+                <h3 class="whyme-title">Communication</h3>
+                <div class="goal-item">
+                    <div class="goal-item-top">
+                        <span class="goal-kind">// ACADEMIC</span>
+                    </div>
+                    <p class="whyme-text">Write clear documentation (code comments, a README and a short note on design choices) for every assignment and project, get feedback on it from my TA or professor at least three times, and apply it to each next submission.</p>
+                </div>
+                <div class="goal-item">
+                    <div class="goal-item-top">
+                        <span class="goal-kind">// WORKPLACE</span>
+                    </div>
+                    <p class="whyme-text">Write and publish three plain-language user guides for Microsoft 365 tools my team supports, collect feedback from my manager and at least five end users on each, and revise until each is rated 4/5 or higher for clarity.</p>
+                </div>
+            </div>
+            <div class="pixel-box goal-card">
+                <div class="color-strip bg-accent"></div>
+                <p class="whyme-num">COMPETENCY 03</p>
+                <h3 class="whyme-title">Curiosity &amp; Imagination</h3>
+                <div class="goal-item">
+                    <div class="goal-item-top">
+                        <span class="goal-kind">// ACADEMIC</span>
+                    </div>
+                    <p class="whyme-text">Attend at least four events outside my required coursework (club meetings, a hackathon, guest talks) and write a half-page reflection after each on an idea I could apply to my studies or career.</p>
+                </div>
+                <div class="goal-item">
+                    <div class="goal-item-top">
+                        <span class="goal-kind">// WORKPLACE</span>
+                    </div>
+                    <p class="whyme-text">Spend one hour a week exploring a Microsoft 365 feature my organization doesn't use yet (such as Copilot, Loop or Power Automate) and pitch at least one time-saving idea to my manager with a short demo.</p>
+                </div>
+            </div>
+        </div>
+        <div class="pixel-box goal-progress">
+            <p class="stat-header">⏱ PROGRESS TRACKING</p>
+            <ol class="goal-progress-list">
+                <li class="goal-progress-item goal-progress-item--done">
+                    <span class="goal-progress-date">OCT 2026</span>
+                    <span class="goal-progress-label">Workplace goals discussed with my manager</span>
+                    <span class="exp-status goal-deadline goal-deadline--done">✔ DONE</span>
+                </li>
+                <li class="goal-progress-item">
+                    <span class="goal-progress-date">DEC 22, 2026</span>
+                    <span class="goal-progress-label">Final workplace goal review</span>
+                    <span class="exp-status goal-deadline">UPCOMING</span>
+                </li>
+                <li class="goal-progress-item">
+                    <span class="goal-progress-date">FEB 2027</span>
+                    <span class="goal-progress-label">Reading week check-in</span>
+                    <span class="exp-status goal-deadline">UPCOMING</span>
+                </li>
+                <li class="goal-progress-item">
+                    <span class="goal-progress-date">APR 2027</span>
+                    <span class="goal-progress-label">Final Learning Portfolio reflection</span>
+                    <span class="exp-status goal-deadline">UPCOMING</span>
+                </li>
+            </ol>
+        </div>
+    </div>
+
+    <div id="projects" class="page-section" style="display: none;">
+        <div class="sec"> 
+        <h2 class="section-title"><span class="animarrow">> </span>  PROJECTS</h2>
+        </div>
+        <div id="projects-grid" class="grid-container">
+            </div>
+    </div>
+
+    <div id="experience" class="page-section" style="display: none;">
+        <h2 class="section-title"><span class="animarrow">> </span> EXPERIENCE</h2>
+
+        <div class="exp-timeline">
+            <div class="exp-item">
+                <div class="exp-node">
+                    <span class="exp-node-dot exp-node-dot--upcoming"></span>
+                </div>
+                <div class="pixel-box exp-card exp-card--upcoming">
+                    <div class="color-strip bg-secondary"></div>
+                    <div class="exp-card-top">
+                        <div class="exp-heading">
+                            <p class="exp-role">Modern Workplace Analyst, Intern</p>
+                            <p class="exp-company">EQ Bank</p>
+                        </div>
+                        <span class="exp-status exp-status--upcoming">// PRESENT</span>
+                    </div>
+                    <div class="exp-meta">
+                        <span class="exp-meta-item"><span class="exp-meta-v">Sep 2026</span></span>
+                        <span class="exp-meta-item"><span class="exp-meta-k">LOC</span><span class="exp-meta-v">Toronto, CA</span></span>
+                    </div>
+                    <ul class="exp-desc">
+                        <li>Deploy, configure, and manage physical and virtual endpoints — laptops, mobile, and Azure Virtual Desktop — using Microsoft Intune and Autopilot.</li>
+                        <li>Support Nerdio workspace management and auto-scaling to optimize resource utilization across the Digital Workspace environment.</li>
+                        <li>Partner with the Cyber Defense Centre to configure endpoint security policies and maintain compliance in co-managed Windows 11 environments.</li>
+                        <li>Assist with patching, vulnerability remediation, and Group Policy / Intune policy troubleshooting to reduce incidents from planned changes.</li>
+                        <li>Automate routine IT workflows with PowerShell and ITSM tooling to streamline service delivery and endpoint support.</li>
+                    </ul>
+                    <div class="tag-container">
+                        <span class="tag">microsoft intune</span>
+                        <span class="tag">azure virtual desktop</span>
+                        <span class="tag">endpoint security</span>
+                        <span class="tag">powershell</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="exp-future">
+                <span class="exp-future-dot"></span>
+                <span class="exp-future-label">// more entries loading...</span>
+            </div>
+        </div>
+
+        <div class="exp-divider">
+            <span class="exp-divider-line"></span>
+            <span class="exp-divider-label">// RESEARCH &amp; PUBLICATIONS</span>
+            <span class="exp-divider-line"></span>
+        </div>
+
+        <div class="pixel-box paper-box">
+            <div class="color-strip bg-primary"></div>
+            <p class="paper-title">Utilization of Philippine Mahogany (Toona calantas) and Gmelina (Gmelina arborea) as Novel Amalgamate Plywood</p>
+            <p class="paper-authors">
+                <span class="paper-author-me">Kyle Colin N. Fernandez</span>, Matthew N. Dalman, Sergio Ruben V. Joya,
+                Romina Franzia Guinevere S. Sapitula, Julia Pauline S. Siton, Jaime Engracio R. Ang,
+                Alexander Daniel C. Del Rosario, Jarylle Kiana Marie Y. Tavera
+            </p>
+            <p class="paper-venue">De La Salle Santiago Zobel School, Vermosa Campus — Imus City</p>
+            <div class="tag-container">
+                <span class="tag">philippine mahogany</span>
+                <span class="tag">gmelina arborea</span>
+                <span class="tag">amalgamate plywood</span>
+                <span class="tag">bending strength</span>
+                <span class="tag">shear bond strength</span>
+            </div>
+            <div class="paper-links">
+                <a href="https://www.researchgate.net/publication/408150505_Utilization_of_Philippine_Mahogany_Toona_calantas_and_Gmelina_Gmelina_arborea_as_Novel_Amalgamate_Plywood"
+                   class="resume-btn paper-link" target="_blank" rel="noopener noreferrer">VIEW PAPER</a>
+                <a href="https://scholar.google.ca/citations?user=P8LEbqUAAAAJ&amp;hl=en"
+                   class="resume-btn paper-link" target="_blank" rel="noopener noreferrer">GOOGLE SCHOLAR</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="skills" class="page-section" style="display: none;">
+    <h2 class="section-title"><span class="animarrow">> </span> SKILLS</h2>
+    <div id="skills-container"></div>
+</div>
+
+    <div id="contact" class="page-section" style="display: none;">
+        <h2 class="section-title"><span class="animarrow">> </span> CONTACT</h2>
+        <div class="pixel-box contact-blurb">
+            <p>whether it's a project, a collab, or just saying hi —</p>
+            <p>feel free to reach out through any of the links below.</p>
+        </div>
+        <form class="pixel-box contact-form" action="mailto:kyconf@gmail.com" method="POST" enctype="text/plain">
+            <div class="contact-form-row">
+                <div class="contact-field">
+                    <label class="contact-field-label">// NAME</label>
+                    <input type="text" name="name" class="contact-input" placeholder="your name" required>
+                </div>
+                <div class="contact-field">
+                    <label class="contact-field-label">// EMAIL</label>
+                    <input type="email" name="email" class="contact-input" placeholder="your@email.com" required>
+                </div>
+            </div>
+            <div class="contact-field">
+                <label class="contact-field-label">// MESSAGE</label>
+                <textarea name="message" class="contact-input contact-textarea" placeholder="what's on your mind?" rows="4" required></textarea>
+            </div>
+            <button type="submit" class="contact-submit">[ SEND MESSAGE ]</button>
+        </form>
+
+        <div class="contact-cards">
+            <a href="mailto:kyconf@gmail.com" class="contact-card">
+                <span class="contact-icon">[ ✉ ]</span>
+                <span class="contact-label">EMAIL</span>
+                <span class="contact-value">kyconf@gmail.com</span>
+            </a>
+            <a href="https://github.com/kyconf" target="_blank" rel="noopener noreferrer" class="contact-card">
+                <span class="contact-icon">[ <svg fill="#4ade80" width="16px" height="16px" viewBox="0 0 98 96" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; position: relative; top: -1px;"><path fill-rule="evenodd" clip-rule="evenodd" d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z"/></svg> ]</span>
+                <span class="contact-label">GITHUB</span>
+                <span class="contact-value">github.com/kyconf</span>
+            </a>
+            <a href="https://www.linkedin.com/in/kyconf/" target="_blank" rel="noopener noreferrer" class="contact-card">
+                <span class="contact-icon">[ in ]</span>
+                <span class="contact-label">LINKEDIN</span>
+                <span class="contact-value">linkedin.com/in/kyconf</span>
+            </a>
+            <a href="https://www.instagram.com/ky_co_nf/" target="_blank" rel="noopener noreferrer" class="contact-card">
+                <span class="contact-icon">[ <svg fill="#4ade80" width="16px" height="16px" viewBox="0 0 32 32" id="Camada_1" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" stroke="#4ade80" style="vertical-align: middle; position: relative; top: -1px;"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <g> <path d="M22.3,8.4c-0.8,0-1.4,0.6-1.4,1.4c0,0.8,0.6,1.4,1.4,1.4c0.8,0,1.4-0.6,1.4-1.4C23.7,9,23.1,8.4,22.3,8.4z"></path> <path d="M16,10.2c-3.3,0-5.9,2.7-5.9,5.9s2.7,5.9,5.9,5.9s5.9-2.7,5.9-5.9S19.3,10.2,16,10.2z M16,19.9c-2.1,0-3.8-1.7-3.8-3.8 c0-2.1,1.7-3.8,3.8-3.8c2.1,0,3.8,1.7,3.8,3.8C19.8,18.2,18.1,19.9,16,19.9z"></path> <path d="M20.8,4h-9.5C7.2,4,4,7.2,4,11.2v9.5c0,4,3.2,7.2,7.2,7.2h9.5c4,0,7.2-3.2,7.2-7.2v-9.5C28,7.2,24.8,4,20.8,4z M25.7,20.8 c0,2.7-2.2,5-5,5h-9.5c-2.7,0-5-2.2-5-5v-9.5c0-2.7,2.2-5,5-5h9.5c2.7,0,5,2.2,5,5V20.8z"></path> </g> </g></svg> ]</span>
+                <span class="contact-label">INSTAGRAM</span>
+                <span class="contact-value">@ky_co_nf</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- <div class="scroll-hint" id="skills-scroll-hint">▼</div> -->
+</main>
+
+<footer class="footer">
+  <div class="mountain">
+    <div class="p"></div><div class="p"></div><div class="p"></div><div class="p"></div><div class="p g"></div><div class="p g"></div><div class="p"></div><div class="p"></div><div class="p"></div><div class="p"></div>
+    <div class="p"></div><div class="p"></div><div class="p"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p"></div><div class="p"></div><div class="p"></div>
+    <div class="p"></div><div class="p"></div><div class="p g"></div><div class="p g"></div><div class="p w"></div><div class="p w"></div><div class="p g"></div><div class="p g"></div><div class="p"></div><div class="p"></div>
+    <div class="p"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p w"></div><div class="p w"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p"></div>
+    <div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div><div class="p g"></div>
+  </div>
+  <div class="footer-line"></div>
+
+  <p>© 2026 Kyle Fernandez</p>
+
+  <div class="social-links">
+    <a href="https://github.com/kyconf" target="_blank" rel="noopener noreferrer">
+      [GITHUB]
+    </a>
+
+    <a href="https://www.linkedin.com/in/kyconf/" target="_blank" rel="noopener noreferrer">
+      [LINKEDIN]
+    </a>
+  </div>
+</footer>
+
+
+
+
+
+
+
+
+
+
+<div class="stars" id="stars"></div>
+<script src="/2d-website/script.js"></script>
+<script src="/2d-website/index.js"></script>
+
+<style>
+/* HD image stays in flow — sets container height */
+.avatar-hd {
+    display: block;
+    width: 100%;
+    margin-top: -40px;
+    /* This one is a PHOTO, not pixel art. .avatar-img sets
+       image-rendering:pixelated for pxArt.png, and inheriting it here made a
+       downscaled JPEG render nearest-neighbour. Worse, .profile-card:hover
+       applies a transform, which promotes the card to its own compositing
+       layer and re-rasterises the image — so the photo visibly changed
+       sampling the moment you hovered it. Smooth scaling, always, and the
+       layer is promoted up front so hovering changes nothing. */
+    image-rendering: auto;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* Pixel art overlays on top */
+.avatar-pixel {
+    position: absolute;
+    top: -40px; left: 0;
+    width: 100%; height: calc(100% + 40px);
+    object-fit: cover;
+    image-rendering: pixelated;
+    opacity: 1;
+    /* visibility flips only once the fade has finished */
+    transition: opacity 1.8s ease-in-out, visibility 0s linear 1.8s;
+}
+
+.avatar-pixel.fade-out {
+    opacity: 0;
+    /* Out of the compositor entirely once faded, so there is nothing left
+       stacked over the photo to blend with or re-rasterise. */
+    visibility: hidden;
+}
+</style>
+
+<script>
+(function() {
+    var hdImg = document.querySelector('.avatar-hd');
+    var pxImg = document.querySelector('.avatar-pixel');
+
+    function startTransition() {
+        // Small delay so the pixel art is visible first
+        setTimeout(function() {
+            pxImg.classList.add('fade-out');
+        }, 900);
+    }
+
+    // Wait for HD image to load before starting the transition
+    if (hdImg.complete) {
+        startTransition();
+    } else {
+        hdImg.addEventListener('load', startTransition);
+    }
+})();
+</script>
+
+</body>
+</html>
