@@ -21,6 +21,14 @@ export default defineConfig({
             res.end(fs.readFileSync(filePath, 'utf-8'));
             return;
           }
+          // Co-op version of the 2D site — same idea, served from its own
+          // subfolder. Vercel serves co-op/index.html at /2d-website/co-op.
+          if (req.url === '/2d-website/co-op' || req.url === '/2d-website/co-op/') {
+            const filePath = path.resolve(__dirname, 'public/2d-website/co-op/index.html');
+            res.setHeader('Content-Type', 'text/html');
+            res.end(fs.readFileSync(filePath, 'utf-8'));
+            return;
+          }
           if (req.url === '/bmo_desktop' || req.url === '/bmo_desktop/') {
             const filePath = path.resolve(__dirname, 'public/bmo_desktop.html');
             res.setHeader('Content-Type', 'text/html');

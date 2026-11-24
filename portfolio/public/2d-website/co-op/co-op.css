@@ -1,0 +1,215 @@
+/* =========================================================
+   CO-OP ONLY STYLES
+   Loaded after /2d-website/externals.css on /2d-website/co-op.
+   The public page never loads this file, so nothing here can
+   leak into it. Reuses the shared variables (--green, --amber…)
+   and classes (pixel-box, color-strip, tag, bio-box, exp-status).
+   ========================================================= */
+
+/* --- Nav: 7 tabs instead of 5, so tighten the side padding --- */
+.nav-item {
+    padding: 15px 28px;
+}
+
+/* --- WHY ME --- */
+
+/* Intro box: bio-box normally flex-grows inside the About column;
+   here it sits on its own, so stop it stretching */
+.whyme-intro,
+.goals-intro {
+    flex: none;
+    margin-bottom: 24px;
+}
+
+/* Bio text keeps its bottom margin from .bio-box p — drop it on the last line */
+.whyme-intro .bio-text,
+.goals-intro .bio-text {
+    margin-bottom: 0;
+}
+
+/* Card grid: as many 280px+ columns as fit */
+.whyme-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+/* Each card: flex column so the tags sit at the bottom
+   (tag-container already has margin-top: auto) */
+.whyme-card,
+.goal-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    transition: transform 0.1s ease-out, border-color 0.15s, background 0.15s;
+}
+
+/* Same hover lift as the About cards */
+.whyme-card:hover,
+.goal-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--green);
+    background: rgba(74, 222, 128, 0.06);
+}
+
+/* Small "01" / "COMPETENCY 01" label above the title */
+.whyme-num {
+    font-family: 'Silkscreen', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--gray-light);
+    margin-bottom: 8px;
+}
+
+/* Card title: same pixel font and white as the project titles */
+.whyme-title {
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--white);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+
+/* Body copy: VT323, matching the experience bullets */
+.whyme-text {
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    line-height: 1.6;
+    color: #ccc;
+    margin: 0;
+    word-wrap: break-word;
+}
+
+/* --- GOALS --- */
+
+/* Competency cards: exactly 3, so auto-fit (not auto-fill) — empty tracks
+   collapse and the three cards stretch across the full row */
+.goals-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    margin-bottom: 24px;
+}
+
+/* One academic / workplace goal inside a competency card */
+.goal-item {
+    padding-top: 12px;
+    margin-top: 12px;
+    border-top: 1px solid var(--gray);
+}
+
+/* Goal label on the left, deadline chip on the right; wraps on narrow cards */
+.goal-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.goal-kind {
+    font-family: 'Silkscreen', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--green);
+}
+
+/* Deadline chip: .exp-status supplies the amber outline; just shrink it a bit */
+.goal-deadline {
+    font-size: 8px;
+    padding: 4px 10px;
+}
+
+/* Completed checkpoint: green instead of amber */
+.goal-deadline--done {
+    border-color: var(--green);
+    color: var(--green);
+}
+
+/* Progress tracking box */
+.goal-progress {
+    padding: 20px;
+}
+
+/* Four checkpoints in a row on desktop */
+.goal-progress-list {
+    list-style: none;
+    padding: 0;
+    margin: 14px 0 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+}
+
+/* Each checkpoint: date, label, status chip stacked; amber left rule */
+.goal-progress-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding-left: 12px;
+    border-left: 2px solid var(--amber);
+}
+
+.goal-progress-item--done {
+    border-left-color: var(--green);
+}
+
+.goal-progress-date {
+    font-family: 'Silkscreen', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--white);
+}
+
+.goal-progress-label {
+    font-family: 'VT323', monospace;
+    font-size: 17px;
+    line-height: 1.4;
+    color: #ccc;
+}
+
+/* --- Responsive --- */
+
+/* Medium windows: tabs a bit tighter still */
+@media (max-width: 1100px) {
+    .nav-item {
+        padding: 15px 18px;
+    }
+}
+
+@media (max-width: 700px) {
+    /* 7 tabs don't fit one row on a phone: wrap to 4 + 3 */
+    .nav-bar {
+        flex-wrap: wrap;
+    }
+    .nav-item {
+        flex: 1 0 25%;
+        padding: 12px 6px;
+        border-bottom: 1px solid var(--gray);
+    }
+
+    /* Cards: one column */
+    .whyme-grid {
+        grid-template-columns: 1fr;
+    }
+    .whyme-text {
+        font-size: 16px;
+    }
+    .goal-progress-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 420px) {
+    .nav-item {
+        padding: 10px 4px;
+    }
+}
+
+/* --- Fix: background stars sit at random left % and are 8px wide, so one
+   near the right edge pokes past the viewport and allows a few px of
+   sideways scroll. Clip them to their container. --- */
+.stars {
+    overflow: hidden;
+}
